@@ -103,7 +103,7 @@ class InterfacialFE_minimization : public MeshRefineStrategy{
 
         std::vector<Real> FE_;
 
-        bool MaxStepCriteria=true;
+        bool MaxStepCriteria=true, boundaryMaxStepCriteria_=true;
 
         // list of things to keep track of
         std::vector<Real> volume_list_, area_list_, Vnbs_list_, Anbs_list_, L2_list_;

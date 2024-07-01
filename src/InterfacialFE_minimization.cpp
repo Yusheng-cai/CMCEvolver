@@ -37,6 +37,7 @@ InterfacialFE_minimization::InterfacialFE_minimization(MeshRefineStrategyInput& 
     pack_.ReadNumber("tolerance", ParameterPack::KeyType::Optional, tol_);
     pack_.ReadNumber("optimize_every", ParameterPack::KeyType::Optional, optimize_every);
     pack_.Readbool("MaxStepCriteria", ParameterPack::KeyType::Optional, MaxStepCriteria);
+    pack_.Readbool("boundaryMaxStepCriteria", ParameterPack::KeyType::Optional, boundaryMaxStepCriteria_);
 
     // boundary terms
     pack_.ReadNumber("boundarymaxstep", ParameterPack::KeyType::Optional, maxBoundaryStep_);
@@ -345,16 +346,21 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 break;
             }
 
-            if (max_boundary_step < boundarytol_){
-                break;
+            if (boundaryMaxStepCriteria_){
+                if (max_boundary_step < boundarytol_){
+                    break;
+                }
+            }
+            else{
+                if (avg_boundary_step < boundarytol_){
+                    break;
+                }
             }
 
             // update iterations
             cont_ind++;
             iteration++;
         }
-
-        std::cout << "L2_g = " << L2_g << std::endl;
 
         Real L2_step = (mean_z - zstar_);
         L2_list_.push_back(L2_);
