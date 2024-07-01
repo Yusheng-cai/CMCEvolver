@@ -1,0 +1,19 @@
+plyfile = {
+    name = FILENAME.ply 
+}
+
+refine = {
+    name = r
+    type = umbrella
+    lambdadt = 1
+    solver = implicit
+    iterations = 100
+    # virtualSite = true
+}
+
+Mesh = {
+	outputs = [ ply nonpbcMesh ]
+	outputNames = [ umbrella.ply umbrella_nonpbc.ply ]
+	BoxLength = [ 10.3 5.9 6.33 ]
+	refinement = [ r ]
+}

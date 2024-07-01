@@ -1,0 +1,24 @@
+plyfile = {
+	 name = generated.ply 
+}
+
+refine = {
+	 name = r
+	 type = CurvatureEvolution	
+	 tolerance = 0.0001
+	 stepsize = 0.005 
+	 k0 = 0.12173
+	 maxstep = 100000
+	 Curvature = {
+		type = curvefit 
+		neighbors = 1 
+	 }
+}
+
+Mesh = {
+	 name = m
+	 outputs = [ ply boundary nonpbcMesh ]
+	 outputNames = [ evo.ply evo_bound.out evo_nonpbc.ply ]
+	 BoxLength = [ 10 8.089 9.037 ]
+	 refinement = [ r ]
+}

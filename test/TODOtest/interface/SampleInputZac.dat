@@ -1,0 +1,55 @@
+xdrfile = {
+    path = ../../SampleTraj/traj_comp.xtc
+}
+
+grofile = {
+    path = ../../SampleTraj/confout.gro
+}
+
+atomgroup = {
+    name      = ice
+    selection = [ atomtype OW ]
+}
+
+curvature   = {
+        name = c
+	type = tensor
+	outputs = [ curvature FaceCurvature ]
+	outputNames = [ tensor.out tensor_fc.out ] 
+}
+
+curvature   = {
+        name = c2
+	type = jetfit
+        neighbors = 3
+        MongeCoefficient = 3
+        degree = 3
+	outputs = [ curvature FaceCurvature ]
+	outputNames = [ jetfit.out jetfit_fc.out ] 
+}
+
+densityfield = {
+    type        = averagefield
+
+    isosurfacevalue  = 16
+    curvature   = [ c c2 ]
+    dimensions  = [ 160 40 50 ]
+    boundingbox = bb
+    sigma       = 0.24
+    cutoff      = 2.5
+    atomgroups  = [ ice ]
+    outputs 	= [ ply field ]
+    outputFiles = [ zacII.ply zacfield.out ]
+}
+
+boundingbox = {
+    name   = bb
+    xrange = [ 0  16.0 ]
+    yrange = [ 0  4.0 ]
+    zrange = [ 0  5.0 ]
+}
+
+driver = {
+    startingframe = 1
+    skip = 10
+}

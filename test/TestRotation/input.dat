@@ -1,0 +1,9 @@
+rotation = {
+    vector1 = [ 0.5 0.5 0 ]
+    vector2 = [ 1 0 0 ]
+}
+
+rotation = {
+    vector1 = [ 1 2 3 ]
+    vector2 = [ 0 0 1 ]
+}

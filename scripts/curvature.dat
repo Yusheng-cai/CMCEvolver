@@ -1,0 +1,28 @@
+plyfile = {
+    name = FILENAME.ply
+}
+
+curvature = {
+    name = jfit
+    type = jetfit
+    outputs = [ curvature ] 
+    outputNames = [ jetfit.out ]
+    neighbors = 2
+    degree = 4
+    MongeCoefficient = 4
+}
+
+curvature = {
+    name = cfit
+    type = curvefit
+    outputs = [ curvature ] 
+    outputNames = [ curvefit.out ]
+    neighbors = 2
+}
+
+curvature = {
+    name = t
+    type = tensor
+    outputs = [ curvature ] 
+    outputNames = [ tensor.out ]
+}

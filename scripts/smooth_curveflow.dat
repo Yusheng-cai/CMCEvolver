@@ -1,0 +1,19 @@
+plyfile = {
+    name = FILENAME.ply 
+}
+
+refine = {
+    name = r
+    type = curvatureflow
+    lambdadt = 0.1
+    solver = implicit
+    iterations = 10
+    # virtualSite = true
+}
+
+Mesh = {
+	outputs = [ ply nonpbcMesh ]
+	outputNames = [ cflow.ply cflow_nonpbc.ply ]
+	BoxLength = [ 10.3 5.9 6.33 ]
+	refinement = [ r ]
+}

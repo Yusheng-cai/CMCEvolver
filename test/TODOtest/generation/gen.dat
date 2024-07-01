@@ -1,0 +1,9 @@
+meshgen = {
+	 type = MeshGen2d
+	 file = boundary_input.dat
+	 size_bound = 0.303
+	 aspect_bound = 0.000
+	 outputs = [ ply nonpbcMesh boundary ]
+	 outputNames = [ generated.ply generated_nonpbc.ply generated_bound.out ]
+	 boxLength = [ 8.0889 9.0365 ]
+}

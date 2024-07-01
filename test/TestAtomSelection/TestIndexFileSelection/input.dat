@@ -1,0 +1,5 @@
+atomgroup = {
+    name      = ice
+    selection = [ indexfile solid_like_atoms.index ]
+    output    = index.out
+}
