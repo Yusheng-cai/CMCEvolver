@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+RELEASE*
+DEBUG*
+glm/
+build.sh
+build*
