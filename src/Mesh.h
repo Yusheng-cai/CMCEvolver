@@ -357,6 +357,7 @@ namespace MeshTools
     void RemoveDuplicatedFaces(Mesh& mesh);
 
     // change winding order of a mesh
+    void ChangeWindingOrderPosZ(Mesh& m);
     void ChangeWindingOrder(Mesh& m);
     void ChangeWindingOrder(Mesh& m, int num);
 
@@ -386,7 +387,7 @@ namespace MeshTools
     void CVT_optimize_Mesh(Mesh& m, Real volume_weight=0.0, int nb_iterations=100);
 
     // CGAL optimize mesh
-    void CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool use_restriction=false);
+    void CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool use_restriction=false, bool AddNewTriangle=true);
 
     void MakePBCMesh(Mesh& m);
     
@@ -430,7 +431,9 @@ namespace MeshTools
 
     Real CalculateMaxCurvature(Mesh& m, const std::vector<int>& BoundaryIndices);
 
-    Real CalculateEta(Mesh& m, Real& Pbar, Real3 Boundary_center={0,0,0});
+    Real CalculateEta(Mesh& m, Real& Pbar, Real& Abar, Real3 Boundary_center={0,0,0});
 
     Real CalculatePbar(Mesh& m, const std::vector<int>& BoundaryIndices, std::vector<Real3>& tdr);
+
+    Real CalculateAbar(Mesh& m);
 };

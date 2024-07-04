@@ -187,6 +187,7 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
 
         if ((i+1) % optimize_every == 0){
             MeshTools::CGAL_optimize_Mesh(*mesh_, 10, 60);
+            MeshTools::ChangeWindingOrderPosZ(*mesh_);
 
             update_Mesh();
         }
@@ -233,7 +234,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             if ((cont_ind+1) % boundary_optimize_every == 0){
                 // then optimize mesh
                 MeshTools::CGAL_optimize_Mesh(curr_m,10,60);
-                MeshTools::ChangeWindingOrder(curr_m);
+                MeshTools::ChangeWindingOrderPosZ(curr_m);
             }
 
                                         // boundary update //

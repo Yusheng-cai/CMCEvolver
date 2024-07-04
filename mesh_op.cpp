@@ -243,4 +243,7 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("Mesh_Eta", "-op Mesh_Eta -i", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::Mesh_Eta(cmd);},\
                                            mapF, mapU);
+    RegisterAction("shiftPBCMesh", "-op shiftPBCMesh -i",\
+                                    [](CommandLineArguments& cmd) -> void {return MeshActions::ShiftPBCMesh(cmd);}, \
+                                    mapF, mapU);
 }

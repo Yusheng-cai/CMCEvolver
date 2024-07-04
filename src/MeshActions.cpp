@@ -445,7 +445,7 @@ void MeshActions::OptimizeMesh(CommandLineArguments& cmd){
     Real degree=60;
     Real3 box;
     int iteration=10;
-    bool use_restriction=false, isperiodic=false;
+    bool use_restriction=false, isperiodic=false, AddNewTriangles=true;
 
     cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
     cmd.readValue("degree", CommandLineArguments::Keys::Optional, degree);
@@ -453,6 +453,7 @@ void MeshActions::OptimizeMesh(CommandLineArguments& cmd){
     cmd.readValue("o", CommandLineArguments::Keys::Optional, outputfname);
     isperiodic = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
     cmd.readBool("use_restriction", CommandLineArguments::Keys::Optional, use_restriction);
+    cmd.readBool("AddNewTriangles", CommandLineArguments::Keys::Optional, AddNewTriangles);
 
     // 
     Mesh m_ply, m_updated;
@@ -461,7 +462,7 @@ void MeshActions::OptimizeMesh(CommandLineArguments& cmd){
         m_ply.setBoxLength(box);
     }
 
-    MeshTools::CGAL_optimize_Mesh(m_ply, iteration, degree, use_restriction);
+    MeshTools::CGAL_optimize_Mesh(m_ply, iteration, degree, use_restriction, AddNewTriangles);
     MeshTools::writePLY(outputfname, m_ply);
 }
 
@@ -1752,8 +1753,26 @@ void MeshActions::MeshifyShape(CommandLineArguments& cmd){
     }
 
     // output the mesh
-    MeshTools::ChangeWindingOrder(m);
+    MeshTools::ChangeWindingOrderPosZ(m);
     m.CalcVertexNormals();
+    MeshTools::writePLY(outputfname, m);
+}
+
+void MeshActions::ShiftPBCMesh(CommandLineArguments& cmd){
+    std::string inputfname, outputfname;
+    Real3 shift, box;
+    bool isPBC=false;
+
+    cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
+    cmd.readArray("shift", CommandLineArguments::Keys::Required, shift);
+    cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
+
+    Mesh m;
+    MeshTools::readPLYlibr(inputfname, m);
+    if (isPBC){m.setBoxLength(box);}
+
+    MeshTools::ShiftPBCMesh(m, shift);
     MeshTools::writePLY(outputfname, m);
 }
 
@@ -3705,18 +3724,25 @@ void MeshActions::DistanceBetweenMeshesMT(CommandLineArguments& cmd){
 void MeshActions::ChangeMeshWindingOrder(CommandLineArguments& cmd){
     std::string inputfname, outputfname;
     Real3 box;
+    bool posZ=false;
 
     cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
     cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    cmd.readBool("posZ", CommandLineArguments::Keys::Optional, posZ);
     bool isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
 
     Mesh m;
     MeshTools::readPLYlibr(inputfname, m);
     if (isPBC){
-        std::cout << "Set box length." << std::endl;
         m.setBoxLength(box);
     }
-    MeshTools::ChangeWindingOrder(m);
+
+    if (posZ){
+        MeshTools::ChangeWindingOrderPosZ(m);
+    }
+    else{
+        MeshTools::ChangeWindingOrder(m);
+    }
     m.CalcVertexNormals();
 
     MeshTools::writePLY(outputfname, m);
@@ -3926,11 +3952,12 @@ void MeshActions::Mesh_Eta(CommandLineArguments& cmd){
     MeshTools::readPLYlibr(inputfname, m);
     if (isPBC) {m.setBoxLength(box);}
 
-    Real Pbar;
-    Real eta = MeshTools::CalculateEta(m, Pbar, boundary_center);
+    Real Pbar, Abar;
+    Real eta = MeshTools::CalculateEta(m, Pbar, Abar, boundary_center);
     std::ofstream ofs;
     ofs.open(outputfname);
     ofs << eta << "\n";
     ofs << Pbar << "\n";
+    ofs << Abar << "\n";
     ofs.close();
 }

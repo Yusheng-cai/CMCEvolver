@@ -1971,6 +1971,9 @@ std::vector<int> MeshTools::RemoveIsolatedVertices(Mesh& mesh){
             t[j] = MapOldIndexToNew[cf[i][j]];
             ASSERT((t[j] != -100), "Something went wrong.");
         }
+        if (t[0] == t[1] || t[1] == t[2] || t[2] == t[0]){
+            std::cout << "Something went wrong in Removing isolated vertice " << std::endl;
+        }
         newF.push_back(t);
     }
 
@@ -2086,7 +2089,7 @@ void MeshTools::RemoveMinimumNeighbors(Mesh& m, int num_search, int min_num_neig
     m.SetVerticesAndTriangles(Newv, Newt);
 }
 
-void MeshTools::ChangeWindingOrder(Mesh& m){
+void MeshTools::ChangeWindingOrderPosZ(Mesh& m){
     std::vector<Real> Area;
     std::vector<Real3> FN;
     MeshTools::CalculateTriangleAreasAndFaceNormals(m, Area, FN);
@@ -2095,6 +2098,12 @@ void MeshTools::ChangeWindingOrder(Mesh& m){
         if (FN[i][2] < 0){
             ChangeWindingOrder(m, i);
         }
+    }
+}
+
+void MeshTools::ChangeWindingOrder(Mesh& m){
+    for (int i=0;i<m.gettriangles().size();i++){
+        ChangeWindingOrder(m, i);
     }
 }
 
@@ -2326,7 +2335,6 @@ void MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector
                     std::cout << "triangle " << index1 << " " << index2 << " " << OpposingIdx << " is wrong" << std::endl;
                 }
 
-
                 Real sintheta = std::sqrt(sin2theta);
                 cotOpposingAnglesSum += costheta/sintheta;
             }
@@ -2481,13 +2489,13 @@ void MeshTools::CVT_optimize_Mesh(Mesh& m, Real volume_weight, int nb_iterations
     m = new_m;
 }
 
-void MeshTools::CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool use_restriction){
+void MeshTools::CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool use_restriction, bool AddNewTriangles){
     M cgal_m;
     Real3 box;
     bool isPeriodic = m.isPeriodic();
 
     if (isPeriodic){
-        MeshTools::ConvertToNonPBCMesh(m, true);
+        MeshTools::ConvertToNonPBCMesh(m, AddNewTriangles);
         box = m.getBoxLength();
     }
 
@@ -2840,7 +2848,7 @@ void MeshTools::MakePBCMesh(Mesh& m){
     std::vector<std::vector<int>> overlapping_index;
     overlapping_index.resize(v.size());
 
-    Real threshold = 1e-5;
+    Real threshold = 1e-8;
 
     // find distances between each of the vertices i,j --> make a map of i,j such that i maps to a vector of j which are close enough to it
     #pragma omp parallel for
@@ -2893,7 +2901,10 @@ void MeshTools::MakePBCMesh(Mesh& m){
         if (!Algorithm::FindInMap(map, f[2], ind3)){ind3=f[2];}
 
         newf.push_back({ind1,ind2,ind3});
-        
+        if (ind1 == ind2 || ind2 == ind3 || ind1 == ind3){
+            std::cout << "Something went wrong, the triangle was initially " << f[0] << " " << f[1] << " " << f[2] << " now it is " << \
+            ind1 << " " << ind2 << " " << ind3 << std::endl;
+        }
     }
 
     const auto& vert = m.getVertexPositions();
@@ -3290,7 +3301,7 @@ MeshTools::Real MeshTools::CalculateMaxCurvature(Mesh& m, const std::vector<int>
     return Pbar / (2 * Abar);
 }
 
-MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real3 Boundary_center){
+MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real& Abar, Real3 Boundary_center){
     // calculate the vertex normal of the mesh
     m.CalcVertexNormals();
 
@@ -3311,6 +3322,9 @@ MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real3 Boundary_cent
     }
 
     eta = eta / Pbar;
+
+    Abar = MeshTools::CalculateAbar(m);
+
     return eta;
 }
 
@@ -3333,4 +3347,17 @@ MeshTools::Real MeshTools::CalculatePbar(Mesh& m, const std::vector<int>& Bounda
     }
 
     return Pbar;
+}
+
+MeshTools::Real MeshTools::CalculateAbar(Mesh& m){
+    std::vector<Real> A;
+    std::vector<Real3> N;
+    MeshTools::CalculateTriangleAreasAndFaceNormals(m, A, N);
+
+    Real Abar=0.0;
+    for (int i=0;i<A.size();i++){
+        Abar += A[i] * N[i][2];
+    }
+
+    return Abar;
 }

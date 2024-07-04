@@ -197,6 +197,8 @@ namespace MeshActions
     // perform iterative closest point to shift a mesh with respect to another
     void ShiftMeshWithRef(CommandLineArguments& cmd);
 
+    void ShiftPBCMesh(CommandLineArguments& cmd);
+
     void ViewMeshWithData(CommandLineArguments& cmd);
 
     // view mesh 
@@ -208,7 +210,7 @@ namespace MeshActions
     // change winding order
     void ChangeMeshWindingOrder(CommandLineArguments& cmd);
 
-    // find face normals
+    // find face normals.size()
     void FindFaceNormals(CommandLineArguments& cmd);
 
     // calculate the surface properties at which the interface is pinned
