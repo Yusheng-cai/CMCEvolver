@@ -163,6 +163,8 @@ namespace MeshActions
 
     void InterfacialFE_min_boundary_L1_constraint(CommandLineArguments& cmd);
 
+    void FindEdgeLength(CommandLineArguments& cmd);
+
     // function that calculates the contact angle
     void CalculateContactAngle(CommandLineArguments& cmd);
 

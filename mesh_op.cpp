@@ -246,4 +246,7 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("shiftPBCMesh", "-op shiftPBCMesh -i",\
                                     [](CommandLineArguments& cmd) -> void {return MeshActions::ShiftPBCMesh(cmd);}, \
                                     mapF, mapU);
+    RegisterAction("FindEdgeLength", "-op FindEdgeLength -i",\
+                                    [](CommandLineArguments& cmd) -> void {return MeshActions::FindEdgeLength(cmd);},\
+                                    mapF, mapU);
 }

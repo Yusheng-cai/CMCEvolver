@@ -128,6 +128,33 @@ void MeshActions::CalculateContactAngle(CommandLineArguments& cmd){
     StringTools::WriteTabulatedData(outputfname, ca);
 }
 
+void MeshActions::FindEdgeLength(CommandLineArguments& cmd){
+    std::string inputfname, outputfname="edge.out";
+    Real3 box;
+    bool isPBC=false;
+
+    cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
+    isPBC=cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
+    cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    Mesh m;
+    MeshTools::readPLYlibr(inputfname, m);
+    if (isPBC){
+        m.setBoxLength(box);
+        m.CalcVertexNormals();
+    }
+
+    std::map<INT2, Real> EdgeLength;
+    MeshTools::CalculateEdgeLength(m, EdgeLength);
+
+    std::ofstream ofs;
+    ofs.open(outputfname);
+    for (auto it = EdgeLength.begin(); it != EdgeLength.end(); it++){
+        ofs << it->first[0] << " " << it->first[1] << " " << it->second << "\n";
+    }
+    ofs.close();
+}
+
+
 void MeshActions::QuadraticCurveFit(CommandLineArguments& cmd){
     std::string inputfname;
     std::string outputfname="quadraticfit.out";
@@ -2194,6 +2221,7 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
 
     while(true){
         std::cout << "L2_list = " << L2_list << std::endl;
+
         // create a temporary mesh
         temp_m = m;
 

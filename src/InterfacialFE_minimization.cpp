@@ -58,25 +58,25 @@ InterfacialFE_minimization::InterfacialFE_minimization(MeshRefineStrategyInput& 
     gamma_ = CalculateGamma(temperature_);
 }
 
-void InterfacialFE_minimization::update_Mesh(){
+void InterfacialFE_minimization::update_Mesh(Mesh& m){
     // obtain map from edge index {minIndex, maxIndex} to the face index 
     // obtain map from vertex index {index} to the Edge Index {minIndex, maxIndex}
-    MeshTools::MapEdgeToFace(*mesh_, MapEdgeToFace_, MapVertexToEdge_);
+    MeshTools::MapEdgeToFace(m, MapEdgeToFace_, MapVertexToEdge_);
 
     // Calculate the boundary vertices --> vertices which that has an edge shared by only 1 face
-    MeshTools::CalculateBoundaryVertices(*mesh_, MapEdgeToFace_, boundaryIndicator_);
+    MeshTools::CalculateBoundaryVertices(m, MapEdgeToFace_, boundaryIndicator_);
 
     // Calculate the vertex neighbors
-    MeshTools::CalculateVertexNeighbors(*mesh_, neighborIndices_);
+    MeshTools::CalculateVertexNeighbors(m, neighborIndices_);
 
     // Map from vertex indices to face indices 
-    MeshTools::MapVerticesToFaces(*mesh_, MapVertexToFace_);
+    MeshTools::MapVerticesToFaces(m, MapVertexToFace_);
 
     // Map from edges to their opposing vertex indices 
-    MeshTools::MapEdgeToOpposingVertices(*mesh_, MapEdgeToFace_, MapEdgeToOpposingVerts_);
+    MeshTools::MapEdgeToOpposingVertices(m, MapEdgeToFace_, MapEdgeToOpposingVerts_);
 
     // find number of vertices 
-    const auto& v = mesh_->getvertices();
+    const auto& v = m.getvertices();
     numVerts_ = v.size();
     newVertices_.clear();newVertices_.resize(numVerts_);
     TotalArea_.clear();TotalArea_.resize(numVerts_);
@@ -87,7 +87,10 @@ Real InterfacialFE_minimization::CalculateGamma(Real temperature){
 }
 
 Real InterfacialFE_minimization::CalculateMu(Real temperature){
-    return 0.021 * temperature - 5.695;
+    Real mu = 0.021 * temperature - 5.695;
+
+    // water ice free energy difference 
+    return -mu;
 }
 
 void InterfacialFE_minimization::setSquaredGradients(Mesh& m){
@@ -105,7 +108,9 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
     FE_.clear();
 
     // first generate necessary things for the mesh
-    update_Mesh();
+    if (need_update_){
+        update_Mesh(*mesh_);
+    }
 
     // calculate cotangent weights 
     for (int i=0;i<maxStep_;i++){
@@ -189,7 +194,7 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
             MeshTools::CGAL_optimize_Mesh(*mesh_, 10, 60);
             MeshTools::ChangeWindingOrderPosZ(*mesh_);
 
-            update_Mesh();
+            update_Mesh(*mesh_);
         }
     }
 
@@ -197,6 +202,9 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
 }
 
 void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
+    need_update_ = false;
+    update_Mesh(m);
+
     area_list_.clear(); volume_list_.clear();
     Vnbs_list_.clear(); Anbs_list_.clear();
     Vunderneath_ = 0.0;
@@ -235,13 +243,14 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 // then optimize mesh
                 MeshTools::CGAL_optimize_Mesh(curr_m,10,60);
                 MeshTools::ChangeWindingOrderPosZ(curr_m);
+                update_Mesh(curr_m);
             }
 
                                         // boundary update //
             // calculate area derivative --> dAdr at the boundary and volume derivative dVdr 
             std::vector<Real3> dAdr ,dVdr;
-            MeshTools::CalculateAreaDerivatives(curr_m, dAdr);
-            MeshTools::CalculateVolumeDerivatives(curr_m, dVdr, Volume_shift);
+            MeshTools::CalculateCotangentWeights(curr_m, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdr);
+            MeshTools::CalculateVolumeDerivatives(curr_m, MapVertexToFace_, dVdr, Volume_shift);
 
             // calculate drdu, drdv, boundaryindices, dAnbsdv, dAnbsdu, dVnbsdv, dVnbsdu
             std::vector<int> BoundaryIndices;
@@ -405,4 +414,6 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
     Vunderneath_     = MeshTools::CalculateVolumeUnderneath(m, 2);
     Vnbs_underneath_ = MeshTools::CalculateVnbsUnderneath(m, shape, 2, 10000, useNumerical_); 
+
+    need_update_ = true;
 }

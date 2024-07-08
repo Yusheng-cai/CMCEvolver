@@ -314,6 +314,8 @@ namespace MeshTools
     // Moller Trumbore Ray-Triangle intersection method 
     bool MTRayTriangleIntersection(Real3& A, Real3& B, Real3& C, Real3& O, Real3& D, Real& t, Real& u, Real& v);
 
+    void CalculateEdgeLength(Mesh& m, std::map<INT2, Real>& edgeLength);
+
     // check degenerate triangles 
     void CheckDegenerateTriangle(Mesh& mesh, \
                                              std::vector<int>& MergeFaces,\

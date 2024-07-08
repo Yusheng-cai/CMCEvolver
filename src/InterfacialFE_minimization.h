@@ -34,7 +34,7 @@ class InterfacialFE_minimization : public MeshRefineStrategy{
     public:
         InterfacialFE_minimization(MeshRefineStrategyInput& input);
 
-        void update_Mesh();
+        void update_Mesh(Mesh& m);
 
         virtual void refine(Mesh& mesh) override;
         void refineBoundary(Mesh& mesh, AFP_shape* shape);
@@ -113,4 +113,6 @@ class InterfacialFE_minimization : public MeshRefineStrategy{
 
         std::vector<Real3> squared_gradients_;
         Real3 epsilon_={1e-10,1e-10,1e-10};
+
+        bool need_update_=true;
 };

@@ -904,9 +904,9 @@ void MeshTools::CalculateTriangleAreasAndFaceNormals(Mesh& mesh, std::vector<Rea
         mesh.getVertexDistance(vertices[index3], vertices[index1], diff2, norm2);
 
         Real3 crossProduct = LinAlg3x3::CrossProduct(diff1, diff2);
-        Real norm = LinAlg3x3::norm(crossProduct);
-        Real a    = norm*0.5;
-        Real3 n   = crossProduct/norm;
+        Real norm          = LinAlg3x3::norm(crossProduct);
+        Real a             = norm*0.5;
+        Real3 n            = crossProduct/norm;
 
         Normals[i] = n;
         Areas[i]   = a;
@@ -3281,7 +3281,7 @@ MeshTools::Real MeshTools::CalculateMaxCurvature(Mesh& m, const std::vector<int>
     // calculate Abar
     std::vector<Real> vecArea;
     std::vector<Real3> Normal;
-    MeshTools::CalculateArea(m, vecArea, Normal);
+    MeshTools::CalculateTriangleAreasAndFaceNormals(m, vecArea, Normal);
 
     #pragma omp parallel
     {
@@ -3361,3 +3361,24 @@ MeshTools::Real MeshTools::CalculateAbar(Mesh& m){
 
     return Abar;
 }
+
+void MeshTools::CalculateEdgeLength(Mesh& m, std::map<INT2,Real>& edgeLength){
+    edgeLength.clear();
+
+    const auto& faces = m.gettriangles();
+    const auto& verts = m.getvertices();
+
+    for (auto f : faces){
+        for (int i=0;i<3;i++){
+            INT2 edge = MeshTools::makeEdge(f[i], f[(i+1) % 3]);
+
+            Real3 dvec;
+            Real d;
+            m.getVertexDistance(verts[f[i]], verts[f[(i+1) % 3]], dvec, d);
+
+            Algorithm::InsertInMap(edgeLength, edge, d);
+        }
+    }
+
+}
+
