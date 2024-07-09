@@ -2436,9 +2436,9 @@ MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::
             // calculate the centroid
             centroid = 1.0 / 3.0 * (v0 + v0 + diff1 + v0 + diff2);
 
-            // shift centroid to center of box
-            Real3 shift = m.getShiftIntoBox(centroid);
-            centroid = centroid + shift;
+            // // shift centroid to center of box
+            // Real3 shift = m.getShiftIntoBox(centroid);
+            // centroid = centroid + shift;
         }
         else{
             centroid = 1.0 / 3.0 * (v0 + v1 + v2);
