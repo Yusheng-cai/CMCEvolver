@@ -906,7 +906,7 @@ void MeshTools::CalculateTriangleAreasAndFaceNormals(Mesh& mesh, std::vector<Rea
         Real3 crossProduct = LinAlg3x3::CrossProduct(diff1, diff2);
         Real norm          = LinAlg3x3::norm(crossProduct);
         Real a             = norm*0.5;
-        Real3 n            = crossProduct/norm;
+        Real3 n            = crossProduct / norm;
 
         Normals[i] = n;
         Areas[i]   = a;
@@ -1133,7 +1133,7 @@ void MeshTools::ConvertToNonPBCMesh(Mesh& mesh, std::vector<Real3>& vertices, st
     }
 }
 
-bool MeshTools::IsPeriodicTriangle(std::vector<vertex>& Vertices,INT3& face, Real3 BoxLength)
+bool MeshTools::IsPeriodicTriangle(const std::vector<vertex>& Vertices,INT3 face, Real3 BoxLength)
 {
     bool IsPeriodic=false;
     for (int i=0;i<3;i++){
@@ -1154,7 +1154,7 @@ bool MeshTools::IsPeriodicTriangle(std::vector<vertex>& Vertices,INT3& face, Rea
     return false;
 }
 
-bool MeshTools::IsPeriodicTriangle(std::vector<vertex>& Vertices,INT3& face, Real3 BoxLength, std::map<INT2,bool>& mapEdge)
+bool MeshTools::IsPeriodicTriangle(const std::vector<vertex>& Vertices,INT3 face, Real3 BoxLength, std::map<INT2,bool>& mapEdge)
 {
     mapEdge.clear();
     for (int i=0;i<3;i++){
@@ -2410,7 +2410,7 @@ void MeshTools::CalculateVolumeDerivatives(Mesh& m, std::vector<Real3>& VolumeDe
     CalculateVolumeDerivatives(m, vtof, VolumeDerivatives, shift);
 }
 
-MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::vector<Real>& vecArea, const std::vector<Real3>& Normal){
+MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::vector<Real>& vecArea, const std::vector<Real3>& Normal, Real3 shift){
     // use divergence theorem to calculate the volume of a mesh
     const auto& verts = m.getvertices();
     const auto& faces = m.gettriangles();
@@ -2425,22 +2425,24 @@ MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::
         Real3 v0,v1,v2;
 
         // initialize the positions
-        v0 = verts[faces[i][0]].position_; v1 = verts[faces[i][1]].position_; v2 = verts[faces[i][2]].position_;
-        
 
         // shift vertices 2 and 3 wrt to the first 
-        if (m.isPeriodic()){
-            m.getVertexDistance(verts[faces[i][1]], verts[faces[i][0]], diff1, diffsq1);
-            m.getVertexDistance(verts[faces[i][2]], verts[faces[i][0]], diff2, diffsq2);
+        std::map<INT2, bool> mapEdge;
+        if (m.isPeriodic() && MeshTools::IsPeriodicTriangle(verts, faces[i].triangleindices_, m.getBoxLength(), mapEdge)){
+            int shift_index=0;
+            if (!MeshTools::FindPeriodicShiftIndex(mapEdge, shift_index)){shift_index=0;std::cout << "Shift index is not found." << std::endl;}
+            v0 = verts[faces[i][shift_index]].position_;
+            v1 = verts[faces[i][(shift_index+1)%3]].position_;
+            v2 = verts[faces[i][(shift_index+2)%3]].position_;
+
+            m.getVertexDistance(v1, v0, diff1, diffsq1);
+            m.getVertexDistance(v2, v0, diff2, diffsq2);
 
             // calculate the centroid
-            centroid = 1.0 / 3.0 * (v0 + v0 + diff1 + v0 + diff2);
-
-            // // shift centroid to center of box
-            // Real3 shift = m.getShiftIntoBox(centroid);
-            // centroid = centroid + shift;
+            centroid = 1.0 / 3.0 * (v0 + v0 + diff1 + v0 + diff2) + shift;
         }
         else{
+            v0 = verts[faces[i][0]].position_; v1 = verts[faces[i][1]].position_; v2 = verts[faces[i][2]].position_;
             centroid = 1.0 / 3.0 * (v0 + v1 + v2);
         }
 
@@ -2755,6 +2757,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMin(CommandLineArguments& cmd){
     cmd.readValue("printevery", CommandLineArguments::Keys::Optional, printevery);
     cmd.readString("Lagrange", CommandLineArguments::Keys::Optional, L);
     cmd.readString("optimize_every", CommandLineArguments::Keys::Optional, optimizeevery);
+    cmd.readString("MaxStepCriteria", CommandLineArguments::Keys::Optional, MaxStepCriteria);
 
     // define parameter packs
     ParameterPack refinePack;
@@ -3112,7 +3115,7 @@ void MeshTools::CalculatedAVnbsdUV(Mesh& m,AFP_shape* shape, std::vector<int>& B
 }
 
 
-void MeshTools::CalculateContactAngle(Mesh& m, AFP_shape* shape, std::vector<Real>& ca){
+void MeshTools::CalculateContactAngle(Mesh& m, AFP_shape* shape, std::vector<Real>& ca, bool useNumerical){
     ca.clear();
 
     // for the shape, we calculate s --> obtain u and v 
@@ -3121,7 +3124,7 @@ void MeshTools::CalculateContactAngle(Mesh& m, AFP_shape* shape, std::vector<Rea
     MeshTools::CalculateBoundaryVerticesIndex(m,  BoundaryIndices);
 
     // in this function, we also ordered the boundaryindices
-    MeshTools::FindBoundaryUV(m, ulist, vlist, BoundaryIndices, shape, true);
+    MeshTools::FindBoundaryUV(m, ulist, vlist, BoundaryIndices, shape, useNumerical);
 
     // now we calculate s,t etc.
     const auto& verts = m.getvertices();
@@ -3133,7 +3136,12 @@ void MeshTools::CalculateContactAngle(Mesh& m, AFP_shape* shape, std::vector<Rea
 
         // get the s 
         Real3 s,t;
-        shape->CalculateNumericalNormalAndTangent(ulist[i], vlist[i],t,s);
+        if (useNumerical){
+            shape->CalculateNumericalNormalAndTangent(ulist[i], vlist[i], t,s);
+        }
+        else{
+            shape->CalculateAnalyticalNormalAndTangent(ulist[i], vlist[i], t ,s);
+        }
 
         // find the dot product between s and N
         ca.push_back(LinAlg3x3::DotProduct(N,s));

@@ -364,7 +364,13 @@ SuperEgg::SuperEgg(const ParameterPack& pack) : AFP_shape(pack){
     pack.ReadNumber("a_alpha", ParameterPack::KeyType::Optional, a_alpha_);
     pack.ReadNumber("b_alpha", ParameterPack::KeyType::Optional, b_alpha_);
     pack.ReadArrayNumber("center", ParameterPack::KeyType::Required, center_);
-    pack.ReadNumber("offset_height", ParameterPack::KeyType::Optional, offset_height);
+    pack.ReadNumber("internal_refinement", ParameterPack::KeyType::Optional, internal_refinement_);
+
+
+    Real du = 2 * Constants::PI / internal_refinement_;
+    for (int i=0;i<internal_refinement_;i++){
+        internal_ulist_.push_back(du * i);
+    }
 }
 
 Real SuperEgg::aBulging(Real z){
@@ -386,7 +392,7 @@ Real SuperEgg::db_dz(Real z){
 
 SuperEgg::Real3 SuperEgg::calculatePos(Real u, Real v){
     Real3 ret;
-    ret[2] = zmax_ * std::sin(v);
+    ret[2] = zmax_ * std::cos(v);
     ret[0] = aBulging(ret[2]) * Algorithm::sgn(std::cos(u)) * std::pow(std::abs(std::cos(u)), 2.0/n_) + center_[0];
     ret[1] = bBulging(ret[2]) * Algorithm::sgn(std::sin(u)) * std::pow(std::abs(std::sin(u)), 2.0/n_) + center_[1];
 
@@ -403,7 +409,7 @@ SuperEgg::Real SuperEgg::CalculateValue(Real3 position, int xdir, int ydir, int 
 
 
 Real SuperEgg::CalculateV(Real3 point, int xdir, int ydir, int zdir){
-    Real v = std::asin((point[zdir] + offset_height) / zmax_);
+    Real v = std::acos((point[zdir]) / zmax_);
 
     return v;
 }
@@ -501,17 +507,49 @@ Real SuperEgg::CalculateU(Real3 point, int xdir, int ydir, int zdir){
 }
 
 Real SuperEgg::CalculateAreaZ(Real z){
-    return 0.0f; 
+    // green's theorem says A = 0.5 * \int x dy - y dx 
+    Real A = 0.0f;
+
+    Real3 p= {0,0,z};
+    Real v = CalculateV(p, 0,1,2);
+
+    std::vector<Real3> pos_list;
+    for (int i=0;i<internal_refinement_;i++){
+        pos_list.push_back(calculatePos(internal_ulist_[i], v));
+    }
+
+    for (int i=0;i<internal_refinement_;i++){
+        Real3 diff = pos_list[(i+1) % internal_refinement_] - pos_list[i];
+        A += pos_list[i][0] * diff[1] - pos_list[i][1] * diff[0];
+    }
+
+    return 0.5 * A;
 }
 
 Real SuperEgg::CalculatePeriZ(Real z){
-    return 0.0f;
+    // we calculate perimeter by summing up the little chuncks
+    Real3 p= {0,0,z};
+    Real v = CalculateV(p, 0,1,2);
+
+    std::vector<Real3> pos_list;
+    for (int i=0;i<internal_refinement_;i++){
+        pos_list.push_back(calculatePos(internal_ulist_[i], v));
+    }
+
+    Real P = 0.0f;
+
+    for (int i=0;i<internal_refinement_;i++){
+        Real3 diff = pos_list[(i+1) % internal_refinement_] - pos_list[i];
+        P += LinAlg3x3::norm(diff);
+    }
+
+    return P;
 }
 
 Real3 SuperEgg::Analyticaldrdu(Real u, Real v){
     Real3 drdu;
     Real dydu, dxdu;
-    Real z = zmax_ * std::sin(v);
+    Real z = zmax_ * std::cos(v);
 
     if (u >= 0){
         dydu = bBulging(z) * 2.0 / (float)n_ * std::pow(std::sin(u), 2.0/(float)n_ - 1) * std::cos(u);
@@ -530,5 +568,5 @@ Real3 SuperEgg::Analyticaldrdu(Real u, Real v){
 }
 
 Real3 SuperEgg::Analyticaldrdv(Real u, Real v){
-    return {0,0,0};
+    return {0,0,zmax_ * std::cos(v)};
 }

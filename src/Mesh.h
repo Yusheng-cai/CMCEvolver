@@ -286,8 +286,8 @@ namespace MeshTools
     void ConvertToNonPBCMesh(Mesh& mesh, bool AddNewTriangles=false);
 
     // check if a particular triangle is periodic
-    bool IsPeriodicTriangle(std::vector<vertex>& Vertices,INT3& face, Real3 BoxLength);
-    bool IsPeriodicTriangle(std::vector<vertex>& Vertices,INT3& face, Real3 BoxLength, std::map<INT2,bool>& mapEdge);
+    bool IsPeriodicTriangle(const std::vector<vertex>& Vertices,INT3 face, Real3 BoxLength);
+    bool IsPeriodicTriangle(const std::vector<vertex>& Vertices,INT3 face, Real3 BoxLength, std::map<INT2,bool>& mapEdge);
     bool IsPeriodicTriangle(const Mesh& mesh, int faceindex);
     bool IsPeriodicTriangle(const Mesh& mesh, int faceindex, std::map<INT2,bool>& mapEdge);
 
@@ -379,7 +379,7 @@ namespace MeshTools
     void CalculateVolumeDerivatives(Mesh& m, const std::vector<std::vector<int>>& MapVertexToFace, std::vector<Real3>& VolumeDerivatives, Real3 shift={0,0,0});
     void CalculateVolumeDerivatives(Mesh& m, std::vector<Real3>& VolumeDerivatives, Real3 shift={0,0,0});
 
-    Real CalculateVolumeDivergenceTheorem(Mesh& m, const std::vector<Real>& vecArea, const std::vector<Real3>& Normal);
+    Real CalculateVolumeDivergenceTheorem(Mesh& m, const std::vector<Real>& vecArea, const std::vector<Real3>& Normal, Real3 shift={0,0,0});
 
     Real CalculateArea(Mesh& m, std::vector<Real>& vecArea, std::vector<Real3>& Normal);
 
@@ -418,7 +418,7 @@ namespace MeshTools
     refineptr ReadInterfacialMin(CommandLineArguments& cmd);
     refineptr ReadInterfacialMinBoundary(CommandLineArguments& cmd);
 
-    void CalculateContactAngle(Mesh& m, AFP_shape* s, std::vector<Real>& ca);
+    void CalculateContactAngle(Mesh& m, AFP_shape* s, std::vector<Real>& ca, bool use_Numerical=true);
     void CalculateContactAngleDerivative(Mesh& m, AFP_shape* s, std::vector<Real>& ca, Real k0, Real3 Volume_shift={0,0,0}, bool use_Numerical=true);
 
     void CalculateAVnbs(Mesh& m, AFP_shape* s, std::vector<int>& BoundaryIndices, std::vector<Real>& ulist,\

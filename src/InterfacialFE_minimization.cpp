@@ -101,6 +101,7 @@ void InterfacialFE_minimization::setSquaredGradients(Mesh& m){
 
 
 void InterfacialFE_minimization::refine(Mesh& mesh){
+    std::cout << "k = " << rho_ * (mu_ + L_) / (2*gamma_) << std::endl;
     // define mesh
     mesh_ = &mesh;
     mesh_->CalcVertexNormals();
@@ -112,11 +113,17 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
         update_Mesh(*mesh_);
     }
 
+    Real3 Volume_shift={0,0,0};
+
+    if (mesh_->isPeriodic()){
+        Volume_shift = -0.5 * mesh_->getBoxLength();
+    }
+
     // calculate cotangent weights 
     for (int i=0;i<maxStep_;i++){
         // calculate the derivatives dAdpi and dVdpi
         MeshTools::CalculateCotangentWeights(*mesh_, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdpi_);
-        MeshTools::CalculateVolumeDerivatives(*mesh_, MapVertexToFace_, dVdpi_);
+        MeshTools::CalculateVolumeDerivatives(*mesh_, MapVertexToFace_, dVdpi_, Volume_shift);
     
         // obtain the vertices
         auto& verts = mesh_->accessvertices();
@@ -182,7 +189,7 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
             std::vector<Real3> Normal;
             std::vector<Real> vecArea;
             Real a = MeshTools::CalculateArea(*mesh_, vecArea, Normal);
-            Real V = MeshTools::CalculateVolumeDivergenceTheorem(*mesh_, vecArea, Normal);
+            Real V = MeshTools::CalculateVolumeDivergenceTheorem(*mesh_, vecArea, Normal, Volume_shift);
             Real E = a - rho_ * (mu_ + L_) / gamma_ * V;
             FE_.push_back(a - rho_ * (mu_ + L_) / gamma_ * V);
             std::cout << "At iteration " << i+1 << " Area = " << a << " " << " Volume = " << V << " Energy = " << E << std::endl;
@@ -265,6 +272,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
             // set max boundary step to be lower initially = -3.40282e38
             std::vector<Real> boundarysteps;
+            std::vector<Real> zlist;
             Real max_boundary_step  = std::numeric_limits<Real>::lowest();
             Real avg_boundary_step  = 0.0f;
             auto& verts             = curr_m.accessvertices();
@@ -311,6 +319,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];
+                zlist.push_back(verts[ind].position_[2]);
 
                 // norm step 
                 Real norm_step = LinAlg3x3::norm(step);
@@ -322,6 +331,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
                 avg_boundary_step += norm_step;
             }
+
 
             // calculate mean z
             mean_z    = mean_z / (Real)N;

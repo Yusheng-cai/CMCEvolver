@@ -108,11 +108,19 @@ void MeshActions::MeshDerivatives(CommandLineArguments& cmd){
 void MeshActions::CalculateContactAngle(CommandLineArguments& cmd){
     std::string inputfname, outputfname="ca.out";
     Real3 box;
+    Real k0;
     bool isPBC=false;
+    bool useDerivative=false;
+    bool useNumerical=true;
 
     cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
     isPBC=cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
     cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    cmd.readBool("useDerivative", CommandLineArguments::Keys::Optional, useDerivative);
+    cmd.readBool("useNumerical", CommandLineArguments::Keys::Optional, useNumerical);
+    if (useDerivative){
+        cmd.readValue("k0", CommandLineArguments::Keys::Required,k0);
+    }
     Mesh m;
     MeshTools::readPLYlibr(inputfname, m);
     if (isPBC){
@@ -124,7 +132,12 @@ void MeshActions::CalculateContactAngle(CommandLineArguments& cmd){
     std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
     std::vector<Real> ca;
 
-    MeshTools::CalculateContactAngle(m, shape.get(), ca);
+    if (useDerivative){
+        MeshTools::CalculateContactAngleDerivative(m, shape.get(), ca, k0, -0.5 * box, useNumerical);
+    }
+    else{
+        MeshTools::CalculateContactAngle(m, shape.get(), ca, useNumerical);
+    }
     StringTools::WriteTabulatedData(outputfname, ca);
 }
 
@@ -2681,7 +2694,6 @@ void MeshActions::ReplicatePeriodicMesh(CommandLineArguments& cmd){
     // requires periodic meshes --> replicates meshes in the 2 directions
     int t1= translate_index[0], t2=translate_index[1];
     int nv = v.size();
-    std::cout << "nv = " << nv << "\n";
     std::vector<vertex> newVertices;
     for (int i=0;i<array_shape[0];i++){
         for (int j=0;j<array_shape[1];j++){
@@ -3085,16 +3097,18 @@ void MeshActions::calculateSurfaceProperties(CommandLineArguments& cmd){
     // declare the shape 
     std::unique_ptr<AFP_shape> shape;
     std::string inputfname, outputfname;
+    int numSteps = 100;
     bool useNumerical=false;
 
     cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
     cmd.readBool("useNumerical", CommandLineArguments::Keys::Optional,useNumerical);
+    cmd.readValue("numSteps", CommandLineArguments::Keys::Optional, numSteps);
 
     shape = MeshTools::ReadAFPShape(cmd);
-    Real num_Steps = 100;
-    Real v_step = Constants::PI / (2 * num_Steps);
+    Real v_step = Constants::PI / (2 * (Real)numSteps);
     std::vector<Real3> normals, tangents;
     std::vector<Real3> pos;
+    std::vector<Real> areas, perimeters;
 
     for (float v = 0; v < Constants::PI / 2; v += v_step){
         Real3 tangent, normal;
@@ -3104,6 +3118,8 @@ void MeshActions::calculateSurfaceProperties(CommandLineArguments& cmd){
         else{
             shape->CalculateAnalyticalNormalAndTangent(0, v, tangent, normal, 0,1,2);
         }
+        areas.push_back(shape->CalculateAreaZ(shape->calculatePos(0,v)[2]));
+        perimeters.push_back(shape->CalculatePeriZ(shape->calculatePos(0,v)[2]));
         pos.push_back(shape->calculatePos(0,v));
         normals.push_back(normal);
         tangents.push_back(tangent);
@@ -3114,7 +3130,7 @@ void MeshActions::calculateSurfaceProperties(CommandLineArguments& cmd){
     for (int i=0;i<normals.size();i++){
         ofs << pos[i][0] << " " << pos[i][1] << " " << pos[i][2] << " " <<  \
                normals[i][0] << " " << normals[i][1] << " " << normals[i][2] << \
-         " " << tangents[i][0] << " " << tangents[i][1] << " " << tangents[i][2] << "\n";
+         " " << tangents[i][0] << " " << tangents[i][1] << " " << tangents[i][2] << " " << areas[i] << " " << perimeters[i] << "\n";
     }
     ofs.close();
 }

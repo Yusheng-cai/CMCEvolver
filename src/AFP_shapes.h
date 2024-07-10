@@ -185,4 +185,7 @@ class SuperEgg : public AFP_shape{
         Real b_alpha_=0.0;
         Real offset_height=0.0;
         Real2 center_;
+        int internal_refinement_=100000;
+
+        std::vector<Real> internal_ulist_;
 };
