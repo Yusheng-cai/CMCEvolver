@@ -52,6 +52,7 @@ InterfacialFE_minimization::InterfacialFE_minimization(MeshRefineStrategyInput& 
     pack_.ReadNumber("L2tolerance", ParameterPack::KeyType::Optional, L2tol_);
     pack_.ReadNumber("zstar_deviation", ParameterPack::KeyType::Optional, zstar_deviation_);
     pack_.Readbool("useNumerical", ParameterPack::KeyType::Optional, useNumerical_);
+    pack_.Readbool("debug", ParameterPack::KeyType::Optional, debug_);
 
     // calculate mu and gamma based on temperature
     mu_ = CalculateMu(temperature_);
@@ -349,18 +350,24 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 break;
             }
 
-            // then do pi refinement --> again
-            this->refine(curr_m);
-
             Real var  = Algorithm::calculateVariance(contact_angle_list);
             mean_ca   = Algorithm::calculateMean(contact_angle_list);
+            Real zvar = Algorithm::calculateVariance(zlist);
             std::cout << "Mean z = " << mean_z << std::endl;
+            std::cout << "z std = "  << std::sqrt(zvar) << std::endl;
             std::cout << "maxmimum boundary step = " << max_boundary_step << std::endl;
             std::cout << "Average boundary step = " << avg_boundary_step << std::endl;
             std::cout << "std of contact angle is " << std::sqrt(var) << std::endl;
             std::cout << "mean of contact angle is " << mean_ca << std::endl; 
             std::cout << "Using L2 = " << L2_ << std::endl;
             std::cout << "Zstar deviation = " << zstar_deviation_ << std::endl;
+
+            if (debug_){
+                MeshTools::writePLY("debugBoundary_" + std::to_string(num_L2_step) + "_" + std::to_string(cont_ind) + ".ply" , curr_m);
+            }
+
+            // then do pi refinement --> again
+            this->refine(curr_m);
 
             if (iteration > maxBoundaryStep_){
                 break;

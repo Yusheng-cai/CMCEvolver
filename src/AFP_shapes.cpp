@@ -27,6 +27,48 @@ Real3 AFP_shape::Numericaldrdv(Real u, Real v){
     return drdv;
 }
 
+Real AFP_shape::CalculateUGivenTargetLength(Real init_u, Real v, Real target_len, Real init_u_step, Real tolerance, Real stepsize){
+    std::vector<Real> length_vec;
+    std::vector<Real> step_vec;
+    Real3 origin,next_p,diff;
+    Real dist;
+
+    origin = this->calculatePos(init_u, v);
+    length_vec.push_back(0);
+    step_vec.push_back(0);
+
+    // guess 2 
+    next_p= this->calculatePos(init_u + init_u_step, v);
+    diff  = next_p - origin;
+    dist  = std::sqrt(LinAlg3x3::DotProduct(diff,diff));
+    length_vec.push_back(dist);
+    step_vec.push_back(init_u_step);
+
+    // start iterating
+    int ind = 0;
+    Real ret_u;
+    while (true){
+        Real deriv = (step_vec[ind+1] - step_vec[ind]) / (length_vec[ind+1] - length_vec[ind]);
+        Real next_u_step = step_vec[ind+1] + stepsize * deriv * (target_len - length_vec[ind+1]); 
+        next_p     = this->calculatePos(init_u + next_u_step, v);
+
+        diff       = next_p - origin;
+        dist       = std::sqrt(LinAlg3x3::DotProduct(diff,diff));
+        length_vec.push_back(dist);
+        step_vec.push_back(next_u_step);
+
+        if (std::abs(dist - target_len) < tolerance){
+            ret_u = next_u_step + init_u;
+            break;
+        }
+
+        ind++;
+    }
+
+    return ret_u;
+}
+
+
 Eigen::MatrixXd AFP_shape::NumericalJacobian(Real u, Real v){
     // jacobian matrix 
     Real3 drdu = Numericaldrdu(u,v);

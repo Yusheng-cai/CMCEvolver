@@ -58,6 +58,8 @@ class AFP_shape {
 
         Real shift_u_in_range(Real u);
 
+        Real CalculateUGivenTargetLength(Real init_u, Real v, Real target_len, Real init_u_step=0.001, Real tolerance=1e-6, Real stepsize=0.1);
+
     protected:
         Real2 center_;
 };

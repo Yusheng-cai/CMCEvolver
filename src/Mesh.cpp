@@ -2783,7 +2783,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     std::string stepsize, ca_file_output="ca.out", T="298", L="0", maxstep="1e5", tolerance="0.00001", printevery="1000", optimize_every="1e10";
     std::string boundarymaxstep="10000", boundarystepsize="0.5", boundarytolerance="5e-6", L2tolerance="5e-5", boundary_optimize_every="300";
     std::string MaxStepCriteria="true", boundaryMaxStepCriteria="true", L2="0", L2_step_size="10.0",L2maxstep="1e5", zstar, zstar_deviation="0.003";
-    std::string dgamma_gamma, useNumerical="false";
+    std::string dgamma_gamma, useNumerical="false", debug="false";
 
     cmd.readString("maxstep", CommandLineArguments::Keys::Optional, maxstep);
     cmd.readString("temperature", CommandLineArguments::Keys::Required, T);
@@ -2808,6 +2808,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     cmd.readString("zstar", CommandLineArguments::Keys::Optional, zstar);
     cmd.readString("MaxStepCriteria", CommandLineArguments::Keys::Optional, MaxStepCriteria);
     cmd.readString("boundaryMaxStepCriteria", CommandLineArguments::Keys::Optional, boundaryMaxStepCriteria);
+    cmd.readString("debug", CommandLineArguments::Keys::Optional,debug);
 
     // define parameter packs
     ParameterPack refinePack;

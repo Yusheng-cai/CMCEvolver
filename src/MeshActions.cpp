@@ -89,10 +89,10 @@ void MeshActions::MeshDerivatives(CommandLineArguments& cmd){
         for (int i=0;i<BoundaryIndices.size();i++){
             int ind = BoundaryIndices[i];
             Real dVdu_this, dVdv_this, dAdu_this, dAdv_this;
-            dVdu_this = LinAlg3x3::DotProduct(dVdr[ind], drdu[ind]);
-            dVdv_this = LinAlg3x3::DotProduct(dVdr[ind], drdv[ind]);
-            dAdu_this = LinAlg3x3::DotProduct(dAdr[ind], drdu[ind]);
-            dAdv_this = LinAlg3x3::DotProduct(dAdr[ind], drdv[ind]);
+            dVdu_this = LinAlg3x3::DotProduct(dVdr[ind], drdu[i]);
+            dVdv_this = LinAlg3x3::DotProduct(dVdr[ind], drdv[i]);
+            dAdu_this = LinAlg3x3::DotProduct(dAdr[ind], drdu[i]);
+            dAdv_this = LinAlg3x3::DotProduct(dAdr[ind], drdv[i]);
 
             dVduv.push_back({dVdu_this, dVdv_this});
             dAduv.push_back({dAdu_this, dAdv_this});
@@ -1600,14 +1600,15 @@ void MeshActions::MeshifyShape(CommandLineArguments& cmd){
     // prepare needed parameters
     Real2 box;
     INT2 num;
-    Real z, min_interpolate_length=0.0;
+    Real z;
     int numBoundary = 60, optimize_iteration=10;
     Real threshold=1.1;
     ParameterPack EvolutionPack, curvePack, shapePack;
     std::string outputfname="out.ply", shape_name="SuperEgg";
-    bool interpolate_boundary=false, optimize=true, pbc=true, shift_pbc=false, inside=false;
+    bool optimize=true, pbc=true, shift_pbc=false, inside=false, useU=true;
     Real optimize_degree=60;
     Real3 shift;
+    Real dist_tolerance=1e-6, starting_u=0.0;
 
     // read input params
     cmd.readArray("box", CommandLineArguments::Keys::Required, box);
@@ -1616,14 +1617,16 @@ void MeshActions::MeshifyShape(CommandLineArguments& cmd){
     cmd.readValue("numBoundary", CommandLineArguments::Keys::Optional, numBoundary);
     cmd.readValue("threshold", CommandLineArguments::Keys::Optional, threshold);
     cmd.readValue("o", CommandLineArguments::Keys::Optional, outputfname);
-    cmd.readBool("interpolate_boundary", CommandLineArguments::Keys::Optional, interpolate_boundary);
-    cmd.readValue("min_interpolate_length", CommandLineArguments::Keys::Optional, min_interpolate_length);
     cmd.readValue("shape", CommandLineArguments::Keys::Optional, shape_name);
     cmd.readBool("inside", CommandLineArguments::Keys::Optional, inside);
     cmd.readBool("optimize", CommandLineArguments::Keys::Optional, optimize);
     cmd.readValue("degree", CommandLineArguments::Keys::Optional, optimize_degree);
     cmd.readValue("iteration", CommandLineArguments::Keys::Optional, optimize_iteration);
     cmd.readBool("pbc", CommandLineArguments::Keys::Optional, pbc);
+    cmd.readBool("useU", CommandLineArguments::Keys::Optional, useU);
+    if (useU){
+        cmd.readValue("starting_u", CommandLineArguments::Keys::Optional, starting_u);
+    }
     shift_pbc = cmd.readArray("shift", CommandLineArguments::Keys::Optional, shift);
 
     // initialize the shape
@@ -1633,119 +1636,122 @@ void MeshActions::MeshifyShape(CommandLineArguments& cmd){
     Real drx = box[0] / num[0]; Real dry = box[1] / num[1];
 
     // define the vectors 
-    std::vector<double> coords;
-    std::vector<Real3> vertices, BoundaryVertices;
+    std::vector<Real3> BoundaryVertices;
     std::vector<INT3> faces;
+    std::vector<Point> points;
 
     // calculate the boundary points 
     Real v = shape->CalculateV({0,0,z});
-    Real du = 2 * Constants::PI / numBoundary;
+    Real P = shape->CalculatePeriZ(z);
 
-    for (int i=0;i<numBoundary;i++){
-        Real3 pos = shape->calculatePos(i*du, v);
-        
-        coords.push_back(pos[0]);
-        coords.push_back(pos[1]);
+    if (!useU){
+        Real du = 2 * Constants::PI / numBoundary;
 
-        Real3 p_real;
-        p_real[0] = pos[0];
-        p_real[1] = pos[1];
-        p_real[2] = pos[2];
-
-        vertices.push_back(p_real);
-        BoundaryVertices.push_back(p_real);
-    }
-
-    // refine boundary a little if necessary
-    if (interpolate_boundary){
-        // if we are interpolating boundary, then we need to keep track of the indices to which we inserted these boundaries
-        std::ofstream ofs;
-        ofs.open("Non_interpolated_indices.out");   
-        for (int i=0;i<vertices.size();i++){
-            ofs << i << "\n";
+        for (int i=0;i<numBoundary;i++){
+            Real3 pos = shape->calculatePos(i*du, v);
+            BoundaryVertices.push_back(pos);
+            points.push_back(Point(pos[0], pos[1]));
         }
-        ofs.close();
+    }
+    else{
+        Real ds = P / (numBoundary);
+        std::cout << "ds = " << ds << std::endl;
 
-        std::vector<Real3> new_verts;
-        int ind = 0;
-        for (int i=0;i<vertices.size();i++){
-            Real3 pos_this = vertices[i];
-            Real3 pos_next = vertices[(i+1) % vertices.size()];
+        std::vector<Real> ulist;
+        Real curr_u = starting_u;
+        ulist.push_back(curr_u);
+        Real3 init_pos = shape->calculatePos(curr_u,v);
 
-            Real3 dist = pos_next - pos_this;
-            Real dist_sq = std::sqrt(LinAlg3x3::DotProduct(dist,dist));
+        while (true){
+            Real3 pos;
+            pos = shape->calculatePos(curr_u,v);
+            points.push_back(Point(pos[0], pos[1]));
+            BoundaryVertices.push_back(pos);
 
-            if (dist_sq > min_interpolate_length){
-                // first find how many points we interpolate
-                int num = std::round(dist_sq / min_interpolate_length);
+            Real3 drdu = shape->Numericaldrdu(curr_u,v);
+            Real next_u= curr_u + ds / std::sqrt(drdu[0] * drdu[0] + drdu[1] * drdu[1]);
+            next_u = shape->CalculateUGivenTargetLength(curr_u, v,ds, 0.01, 1e-8);
 
-                // direction of the line
-                Real3 dir = dist / dist_sq;
-
-                // stepsize we take every step
-                Real stepsize = dist_sq / num; 
-
-                for (int j=1;j<num;j++){
-                    coords.push_back(pos_this[0] + j * stepsize * dir[0]);
-                    coords.push_back(pos_this[1] + j * stepsize * dir[1]);
-
-                    Real3 new_pos;
-
-                    new_pos[0] = pos_this[0] + j * stepsize * dir[0];
-                    new_pos[1] = pos_this[1] + j * stepsize * dir[1];
-                    new_pos[2] = z;
-
-                    new_verts.push_back(new_pos);
-                }
+            if (next_u > 2 * Constants::PI){
+                break;
+            }
+            else{
+                ulist.push_back(std::fmod(next_u, 2*Constants::PI));
+                curr_u = next_u;
             }
         }
-        vertices.insert(vertices.end(), new_verts.begin(), new_verts.end());
+
     }
 
-    int total_boundary = vertices.size();
-    
+    int total_boundary = points.size();
+    std::cout << "total boundary = " << total_boundary << std::endl;
 
     // now we start the calculation --> any point that is outside the threshold, we mark it as part of the mesh
     for (int i=0;i<num[0]+1;i++){
         for (int j=0;j<num[1]+1;j++){
             // obtain the position
-            Real3 position = {i * drx , j * dry, z};
+            Real3 position = {(double)i * drx , (double)j * dry, z};
 
             // calculate the shape value
             Real val = shape->CalculateValue(position, 0,1,2);
 
             if (! inside){
                 if (val > threshold){
-                    coords.push_back(position[0]);
-                    coords.push_back(position[1]);
-                    vertices.push_back(position);
+                    points.push_back(Point(position[0], position[1])); 
                 }
             }
             else{
                 if (val < 0.95){
-                    coords.push_back((double)position[0]);
-                    coords.push_back((double)position[1]);
-
-                    vertices.push_back(position);
+                    points.push_back(Point(position[0], position[1])); 
                 }
             }
         }
     }
 
-    StringTools::WriteTabulatedData("Tverts.out", vertices);
-
     // delaunize the triangles
-    delaunator::Delaunator d(coords);
+    Delaunay dt;
+    dt.insert(points.begin(), points.end());
 
-    std::vector<Real3> real_v;
+    // Map to store the vertex indices
+    std::unordered_map<Delaunay::Vertex_handle, int> vertex_indices;
+    int index = 0;
+    std::vector<Real3> vertex_pos;
+    std::vector<int> BoundaryInd;
 
-    for(std::size_t i = 0; i < d.triangles.size(); i+=3) {
-        INT3 f = {d.triangles[i], d.triangles[i+1], d.triangles[i+2]};
+    // Assign an index to each vertex
+    for (auto vertex = dt.finite_vertices_begin(); vertex != dt.finite_vertices_end(); ++vertex) {
+        vertex_indices[vertex] = index;
+        Real3 vpos = {vertex->point().x(), vertex->point().y(),z};
+        vertex_pos.push_back(vpos);
+
+        for (auto& bv : BoundaryVertices){
+            Real3 diff = vpos - bv;
+            Real dist  = std::sqrt(LinAlg3x3::DotProduct(diff,diff));
+            if (dist < 1e-5){
+                BoundaryInd.push_back(index);
+            }
+        }
+        index++;
+    }
+
+    // Iterate through the finite faces and extract the indices of their vertices
+    std::vector<INT3> face_indices;
+    for (auto face = dt.finite_faces_begin(); face != dt.finite_faces_end(); ++face) {
+        int i1 = vertex_indices[face->vertex(0)];
+        int i2 = vertex_indices[face->vertex(1)];
+        int i3 = vertex_indices[face->vertex(2)];
+        if (Algorithm::contain(BoundaryInd, i1) && Algorithm::contain(BoundaryInd,i2) && Algorithm::contain(BoundaryInd,i3)){
+            continue;
+        }
+
+        // construct the face
+        INT3 f = {i1, i2, i3};
+
         // find the length of the 3 edges
         Real3 v1,v2,v3;
         Real3 d1,d2,d3;
         Real d1_sq, d2_sq, d3_sq;
-        v1 = vertices[f[0]]; v2= vertices[f[1]]; v3 =vertices[f[2]];
+        v1 = vertex_pos[f[0]]; v2= vertex_pos[f[1]]; v3 =vertex_pos[f[2]];
 
         d1 = v2 -v1; d2 = v3-v1; d3= v3-v2;
         d1_sq = std::sqrt(LinAlg3x3::DotProduct(d1,d1));
@@ -1755,25 +1761,11 @@ void MeshActions::MeshifyShape(CommandLineArguments& cmd){
         if (d1_sq > 0.2 || d2_sq > 0.2 || d3_sq > 0.2){
             continue;
         }
-        if (f[0] < total_boundary && f[1] < total_boundary && f[2] < total_boundary){
-            continue;
-        }
-        else{
-            Real3 crossP = LinAlg3x3::CrossProduct(d1,d2);
-            if (crossP[2] < 0){
-                INT3 nf;
-                nf[0] = f[1];
-                nf[1] = f[0];
-                nf[2] = f[2];
-                faces.push_back(nf);
-            }
-            else{
-                faces.push_back(f);
-            }
-        }
+
+        face_indices.push_back(f);
     }
 
-    Mesh m(vertices, faces);
+    Mesh m(vertex_pos, face_indices);
 
     // optimize the mesh a little
     if (optimize){

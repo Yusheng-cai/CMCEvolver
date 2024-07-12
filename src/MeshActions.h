@@ -47,7 +47,7 @@
 #include <CGAL/Polygon_mesh_processing/refine.h>
 #include <CGAL/Polygon_mesh_processing/fair.h>
 #include <CGAL/Polygon_mesh_processing/angle_and_area_smoothing.h>
-
+#include <CGAL/Delaunay_triangulation_2.h>
 
 namespace MeshActions
 {
@@ -62,6 +62,8 @@ namespace MeshActions
 
     typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
     typedef CGAL::Surface_mesh<K::Point_3>                      M;
+    typedef CGAL::Delaunay_triangulation_2<K> Delaunay;
+    typedef K::Point_2 Point;
     namespace PMP = CGAL::Polygon_mesh_processing;
 
     // Calculate mesh derivatives
