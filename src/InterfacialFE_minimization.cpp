@@ -346,7 +346,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
             // once we updated the boundary, let's check its perimeter and area again
             Real max_k = MeshTools::CalculateMaxCurvature(curr_m, BoundaryIndices);
-            if (std::abs(kk / max_k) > 0.95){
+            if (std::abs(kk / max_k) > 1.0){
                 std::cout << "Not converged." << std::endl;
                 break;
             }
