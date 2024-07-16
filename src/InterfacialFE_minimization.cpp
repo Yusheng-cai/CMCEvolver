@@ -347,6 +347,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             // once we updated the boundary, let's check its perimeter and area again
             Real max_k = MeshTools::CalculateMaxCurvature(curr_m, BoundaryIndices);
             if (std::abs(kk / max_k) > 0.95){
+                std::cout << "Not converged." << std::endl;
                 break;
             }
 
@@ -414,7 +415,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
     // get the information about the boundary indices 
     std::vector<int> BoundaryIndices;
     std::vector<Real> ulist, vlist;
-    MeshTools::CalculateBoundaryVerticesIndex(m, BoundaryIndices,false);
+    MeshTools::CalculateBoundaryVerticesIndex(m, BoundaryIndices,true);
     MeshTools::FindBoundaryUV(m, ulist, vlist, BoundaryIndices, shape);
 
     // calculate area and volume after boundary steps

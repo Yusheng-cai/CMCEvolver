@@ -3959,6 +3959,7 @@ void MeshActions::Mesh_AVnbs(CommandLineArguments& cmd){
     cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
     cmd.readValue("num_v", CommandLineArguments::Keys::Optional, num_v);
     cmd.readBool("useNumerical", CommandLineArguments::Keys::Optional, useNumerical);
+    cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
     bool isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
 
     std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
@@ -3970,7 +3971,11 @@ void MeshActions::Mesh_AVnbs(CommandLineArguments& cmd){
     Real A,V;
     MeshTools::CalculateAVnbs(m, shape.get(), A, V,\
                                    num_v,useNumerical, -0.5*box);
-    std::cout << "Area = " << A << " Volume = " << V << std::endl;
+    std::ofstream ofs; 
+    ofs.open(outputfname);
+    ofs << A << "\n";
+    ofs << V << "\n";
+    ofs.close();
 }
 
 
