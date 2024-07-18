@@ -249,4 +249,7 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("FindEdgeLength", "-op FindEdgeLength -i",\
                                     [](CommandLineArguments& cmd) -> void {return MeshActions::FindEdgeLength(cmd);},\
                                     mapF, mapU);
+    RegisterAction("CalculateAreaDistribution", "-op CalculateAreaDistribution -i" , \
+                                    [](CommandLineArguments& cmd) -> void {return MeshActions::calculateAreaDistribution(cmd);},\
+                                    mapF, mapU);
 }

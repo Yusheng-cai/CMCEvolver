@@ -373,7 +373,7 @@ namespace MeshTools
     // // calculate the volume enclosed underneath an interface
     Real CalculateVolumeUnderneath(Mesh& m, int projected_plane=2);
     
-    void CalculateCotangentWeights(Mesh& m, const std::vector<std::vector<int>>& neighborIndices, const std::map<INT2, std::vector<int>>& MapEdgeToFace, const std::map<INT2, std::vector<int>>& MapEdgeToOpposingVerts, std::vector<Real3>& dAdpi);
+    bool CalculateCotangentWeights(Mesh& m, const std::vector<std::vector<int>>& neighborIndices, const std::map<INT2, std::vector<int>>& MapEdgeToFace, const std::map<INT2, std::vector<int>>& MapEdgeToOpposingVerts, std::vector<Real3>& dAdpi);
     void CalculateAreaDerivatives(Mesh& m, std::vector<Real3>& dAdpi);
 
     void CalculateVolumeDerivatives(Mesh& m, const std::vector<std::vector<int>>& MapVertexToFace, std::vector<Real3>& VolumeDerivatives, Real3 shift={0,0,0});
@@ -417,6 +417,7 @@ namespace MeshTools
 
     refineptr ReadInterfacialMin(CommandLineArguments& cmd);
     refineptr ReadInterfacialMinBoundary(CommandLineArguments& cmd);
+    Mesh ReadMesh(CommandLineArguments& cmd);
 
     void CalculateContactAngle(Mesh& m, AFP_shape* s, std::vector<Real>& ca, bool use_Numerical=true);
     void CalculateContactAngleDerivative(Mesh& m, AFP_shape* s, std::vector<Real>& ca, Real k0, Real3 Volume_shift={0,0,0}, bool use_Numerical=true);

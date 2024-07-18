@@ -2267,7 +2267,7 @@ void MeshTools::MeshPlaneIntersection(Mesh& m, Real3& points, Real3& normal){
     TriangleCases(face_signs, basic, one_vertex, one_edge);
 }
 
-void MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector<int>>& neighborIndices, const std::map<INT2, std::vector<int>>& MapEdgeToFace, const std::map<INT2, std::vector<int>>& MapEdgeToOpposingVerts, std::vector<Real3>& dAdpi)
+bool MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector<int>>& neighborIndices, const std::map<INT2, std::vector<int>>& MapEdgeToFace, const std::map<INT2, std::vector<int>>& MapEdgeToOpposingVerts, std::vector<Real3>& dAdpi)
 {
     // obtain triangles and vertices from mesh
     const auto& triangles = m.gettriangles();
@@ -2276,6 +2276,8 @@ void MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector
     dAdpi.resize(vertices.size(), {});
 
     // get the neighbor indices 
+    bool flag=true;
+
     #pragma omp parallel for
     for (int i=0;i<neighborIndices.size();i++){
         // find the neighbor of vertex i
@@ -2333,6 +2335,11 @@ void MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector
                 if (sin2theta < 1e-8){
                     std::cout << "sin2theta = " << sin2theta << std::endl;
                     std::cout << "triangle " << index1 << " " << index2 << " " << OpposingIdx << " is wrong" << std::endl;
+
+                    #pragma omp critical
+                    {
+                        flag = false;
+                    }
                 }
 
                 Real sintheta = std::sqrt(sin2theta);
@@ -2346,6 +2353,8 @@ void MeshTools::CalculateCotangentWeights(Mesh& m, const std::vector<std::vector
         // add to dAdpi
         dAdpi[i] = 0.5 * dAdpi_j;
     }
+
+    return flag;
 }
 
 void MeshTools::CalculateAreaDerivatives(Mesh& m, std::vector<Real3>& dAdpi){
@@ -2822,6 +2831,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     refinePack.insert("print_every", printevery);
     refinePack.insert("MaxStepCriteria", MaxStepCriteria);
     refinePack.insert("boundaryMaxStepCriteria", boundaryMaxStepCriteria);
+    refinePack.insert("debug", debug);
 
     // boundary terms
     refinePack.insert("boundarymaxstep", boundarymaxstep);
@@ -2841,6 +2851,23 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     r = refineptr(MeshRefineStrategyFactory::Factory::instance().create("InterfacialFE_minimization", input));
 
     return std::move(r);
+}
+
+Mesh MeshTools::ReadMesh(CommandLineArguments& cmd){
+    std::string inputfname;
+    Real3 box;
+
+    cmd.readValue("i", CommandLineArguments::Keys::Required, inputfname);
+    bool isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
+
+    Mesh m;
+    MeshTools::readPLYlibr(inputfname, m);
+
+    if (isPBC){
+        m.setBoxLength(box);
+    }
+
+    return m;
 }
 
 void MeshTools::MakePBCMesh(Mesh& m){

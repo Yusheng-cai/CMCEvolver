@@ -163,6 +163,8 @@ namespace MeshActions
 
     void InterfacialFE_min_boundary(CommandLineArguments& cmd);
 
+    void InterfacialFE_min_boundary_range(CommandLineArguments& cmd);
+
     void InterfacialFE_min_boundary_L1_constraint(CommandLineArguments& cmd);
 
     void FindEdgeLength(CommandLineArguments& cmd);
@@ -222,6 +224,9 @@ namespace MeshActions
 
     // calculate the surface area
     void calculateSurfaceArea(CommandLineArguments& cmd);
+
+    // calculate area distribution
+    void calculateAreaDistribution(CommandLineArguments& cmd);
 
     // calculate volume
     void calculateInterfaceVolume(CommandLineArguments& cmd);

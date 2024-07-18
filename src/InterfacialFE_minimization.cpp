@@ -210,6 +210,7 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
 }
 
 void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
+    std::cout << "debug = " << debug_ << std::endl;
     need_update_ = false;
     update_Mesh(m);
 
@@ -231,6 +232,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
     }
 
     int num_L2_step=0;
+    Real last_L2   =L2_;
     // outer loop for Lagrange refinement
     while (true) {
         Real mean_z;
@@ -243,6 +245,10 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
         Mesh curr_m = m_flatContact_;
         Real L2_g   = 0.0f;
         bool exceed_zstar_deviation=false;
+
+        if (debug_){
+            MeshTools::writePLY("debugBoundaryStart_" + std::to_string(num_L2_step) + ".ply" , curr_m);
+        }
 
         // inner loop for pi, pib, L2 refinement
         while (true){
@@ -257,7 +263,13 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                                         // boundary update //
             // calculate area derivative --> dAdr at the boundary and volume derivative dVdr 
             std::vector<Real3> dAdr ,dVdr;
-            MeshTools::CalculateCotangentWeights(curr_m, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdr);
+            if (! MeshTools::CalculateCotangentWeights(curr_m, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdr)){
+                MeshTools::CGAL_optimize_Mesh(curr_m, 10, 60);
+                MeshTools::ChangeWindingOrderPosZ(curr_m);
+                update_Mesh(curr_m);
+                std::cout << "Optimizing mesh." << std::endl;
+                ASSERT(MeshTools::CalculateCotangentWeights(curr_m, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdr), "Something is seriously wrong");
+            }
             MeshTools::CalculateVolumeDerivatives(curr_m, MapVertexToFace_, dVdr, Volume_shift);
 
             // calculate drdu, drdv, boundaryindices, dAnbsdv, dAnbsdu, dVnbsdv, dVnbsdu
@@ -316,7 +328,13 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 contact_angle_list.push_back(ca);
 
                 // update vlist 
-                verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
+                Real3 shift_vec;
+                curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
+                new_p = new_p + shift_vec;
+                verts[ind].position_ = new_p;
+
+                // verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];
@@ -371,6 +389,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             this->refine(curr_m);
 
             if (iteration > maxBoundaryStep_){
+                std::cout << "Exceed max boundary step." << std::endl;
                 break;
             }
 
@@ -406,7 +425,13 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             }
         }
         else{
-            L2_ = L2_ + L2_stepsize_ * L2_step;
+            Real updated_L2 = L2_ + L2_stepsize_ * L2_step;
+            if (std::abs(updated_L2 - last_L2) < L2tol_ * L2_stepsize_){
+                updated_L2 = L2_ + L2_stepsize_ * 0.5 * L2_step;
+            }
+
+            last_L2 = L2_;
+            L2_     = updated_L2;
         }
         
         num_L2_step++;
