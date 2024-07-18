@@ -110,9 +110,7 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
     FE_.clear();
 
     // first generate necessary things for the mesh
-    if (need_update_){
-        update_Mesh(*mesh_);
-    }
+    update_Mesh(*mesh_);
 
     Real3 Volume_shift={0,0,0};
 
@@ -210,9 +208,8 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
 }
 
 void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
-    std::cout << "debug = " << debug_ << std::endl;
-    need_update_ = false;
     update_Mesh(m);
+    need_update_ = false;
 
     area_list_.clear(); volume_list_.clear();
     Vnbs_list_.clear(); Anbs_list_.clear();
@@ -327,14 +324,14 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 Real ca = 1.0 / dAnbsdv * (-dAdv + rho_ * (L_ + mu_) / gamma_ * (dVdv + dVnbsdv));
                 contact_angle_list.push_back(ca);
 
-                // update vlist 
-                Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
-                Real3 shift_vec;
-                curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
-                new_p = new_p + shift_vec;
-                verts[ind].position_ = new_p;
+                // // update vlist 
+                // Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
+                // Real3 shift_vec;
+                // curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
+                // new_p = new_p + shift_vec;
+                // verts[ind].position_ = new_p;
 
-                // verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];
@@ -383,6 +380,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
 
             if (debug_){
                 MeshTools::writePLY("debugBoundary_" + std::to_string(num_L2_step) + "_" + std::to_string(cont_ind) + ".ply" , curr_m);
+                std::cout << "we are now going to optimize debugBoundary " << std::to_string(num_L2_step) << "_" << std::to_string(cont_ind) << "\n"; 
             }
 
             // then do pi refinement --> again
