@@ -163,6 +163,8 @@ namespace MeshActions
 
     void InterfacialFE_min_boundary(CommandLineArguments& cmd);
 
+    void InterfacialFE_min_boundary_k(CommandLineArguments& cmd);
+
     void InterfacialFE_min_boundary_range(CommandLineArguments& cmd);
 
     void InterfacialFE_min_boundary_L1_constraint(CommandLineArguments& cmd);

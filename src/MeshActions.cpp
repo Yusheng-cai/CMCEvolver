@@ -2164,6 +2164,79 @@ void MeshActions::InterfacialFE_min(CommandLineArguments& cmd){
     }
 }
 
+void MeshActions::InterfacialFE_min_boundary_k(CommandLineArguments& cmd){
+    std::string inputfname, outputfname="evolved.ply";
+    Real3 box;
+    Real k=0.0;
+
+    // read input
+    cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
+    cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    cmd.readValue("k", CommandLineArguments::Keys::Optional, k);
+
+    // initialize the shape
+    std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
+    refineptr r = MeshTools::ReadInterfacialMinBoundary(cmd);
+
+    // read input mesh 
+    bool isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
+    Mesh m, temp_m;
+    MeshTools::readPLYlibr(inputfname, m);
+    if (isPBC){m.setBoxLength(box);}
+
+    // get the interfacialFE_minimization ptr
+    InterfacialFE_minimization* temp_r = dynamic_cast<InterfacialFE_minimization*>(r.get());
+    Real rho   = temp_r->getrho();
+    Real mu    = temp_r->getmu();
+    Real gamma = temp_r->getgamma();
+
+    // volume shift
+    Real3 Volume_shift = -0.5 * box;
+    std::vector<Real> k_list, L2_list, v_list, vnbs_list, anbs_list, a_list, vtot_list;
+
+    // first calculate the boundary averages
+    Real avg_z     = MeshTools::CalculateBoundaryAverageHeight(m);
+    Real A_contact = shape->CalculateAreaZ(avg_z);
+    Real P_contact = shape->CalculatePeriZ(avg_z);
+
+    // first iteration of shooting method --> first set temp_r to m
+    temp_m = m;
+    temp_r->setK(k);
+    temp_r->refineBoundary(temp_m, shape.get());
+    L2_list.push_back(temp_r->getL2());
+    a_list.push_back(temp_r->getarea());
+    v_list.push_back(temp_r->getvolume());
+    vnbs_list.push_back(temp_r->getVnbs());
+    anbs_list.push_back(temp_r->getAnbs());
+    vtot_list.push_back(temp_r->getVunderneath() - temp_r->getVnbs_underneath());
+
+
+    // reset the mesh
+    m = temp_m;
+    
+    // obtain the file name -->  a.ply --> a 
+    std::string fname = StringTools::ReadFileName(outputfname);
+
+    // write the ply file
+    MeshTools::writePLY(outputfname, m);
+
+    // write the volume and area
+    StringTools::WriteTabulatedData(fname + "_volume.out", v_list);
+    StringTools::WriteTabulatedData(fname + "_vnbs.out", vnbs_list);
+    StringTools::WriteTabulatedData(fname + "_area.out", a_list);
+    StringTools::WriteTabulatedData(fname + "_anbs.out", anbs_list);
+    StringTools::WriteTabulatedData(fname + "_L2.out", L2_list);
+    StringTools::WriteTabulatedData(fname + "_Vtot.out", vtot_list);
+
+    // // write the contact angle
+    std::vector<Real> ca_list_deriv, ca_list_NS;
+    MeshTools::CalculateContactAngleDerivative(m, shape.get(), ca_list_deriv, k, Volume_shift);
+    MeshTools::CalculateContactAngle(m, shape.get(), ca_list_NS);
+    StringTools::WriteTabulatedData(fname + "_ca_deriv.out", ca_list_deriv);
+    StringTools::WriteTabulatedData(fname + "_ca_NdotS.out", ca_list_NS);
+}
+
+
 void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     std::string inputfname, outputfname="evolved.ply";
     std::string MaxStepCriteria="true";

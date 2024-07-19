@@ -2501,10 +2501,14 @@ void MeshTools::CVT_optimize_Mesh(Mesh& m, Real volume_weight, int nb_iterations
 }
 
 void MeshTools::CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool use_restriction, bool AddNewTriangles){
+    // Make cgal mesh
     M cgal_m;
+
+    // define box and periodicity of the mesh
     Real3 box;
     bool isPeriodic = m.isPeriodic();
 
+    // if the mesh is periodic, we need to convert it to non pbc mesh
     if (isPeriodic){
         MeshTools::ConvertToNonPBCMesh(m, AddNewTriangles);
         box = m.getBoxLength();
@@ -2555,13 +2559,16 @@ void MeshTools::CGAL_optimize_Mesh(Mesh& m, int nb_iterations, Real degree, bool
         new_f_list.push_back(new_f);
     }
 
+    // create new mesh in our own definition
     Mesh new_m(new_p_list, new_f_list);
 
+    // if the mesh is periodic, we need to convert it back 
     if (isPeriodic){
         new_m.setBoxLength(box);
         MeshTools::MakePBCMesh(new_m);
     }
 
+    // rewrite the original mesh
     m = new_m;
     m.CalcVertexNormals();
 }

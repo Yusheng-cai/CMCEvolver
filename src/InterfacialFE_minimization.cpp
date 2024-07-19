@@ -172,16 +172,14 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
 
         avg_step /= total_verts;
 
-
         // calculate the vertex normals 
         mesh_->CalcVertexNormals();
 
-        if (MaxStepCriteria){
-            if (max < tol_){break;}
-        }
-        else{
-            if (avg_step < tol_){break;}
-        }
+        if (MaxStepCriteria){if (max < tol_){break;}}
+        else{if (avg_step < tol_){break;}}
+
+        // max to average step ratio
+        Real max_avg_ratio = max / avg_step;
 
         // print if necessary
         if ((i+1) % print_every == 0){
@@ -201,6 +199,12 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
             MeshTools::ChangeWindingOrderPosZ(*mesh_);
 
             update_Mesh(*mesh_);
+
+            // if (max_avg_ratio > 10){
+            //     std::cout << "max step = " << max << std::endl;
+            //     std::cout << "average = " << avg_step << std::endl;
+            //     std::cout << "Optimzied because of max avg ratio" << std::endl;
+            // }
         }
     }
 
@@ -239,7 +243,10 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
         int iteration = 0;
         int cont_ind  = 0;
 
+        // set curr m to the orignal flat mesh --> also update all the corresponding things!
         Mesh curr_m = m_flatContact_;
+        update_Mesh(curr_m);
+
         Real L2_g   = 0.0f;
         bool exceed_zstar_deviation=false;
 
@@ -264,7 +271,6 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 MeshTools::CGAL_optimize_Mesh(curr_m, 10, 60);
                 MeshTools::ChangeWindingOrderPosZ(curr_m);
                 update_Mesh(curr_m);
-                std::cout << "Optimizing mesh." << std::endl;
                 ASSERT(MeshTools::CalculateCotangentWeights(curr_m, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdr), "Something is seriously wrong");
             }
             MeshTools::CalculateVolumeDerivatives(curr_m, MapVertexToFace_, dVdr, Volume_shift);
@@ -330,7 +336,6 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 // curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
                 // new_p = new_p + shift_vec;
                 // verts[ind].position_ = new_p;
-
                 verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
 
                 // update the mean z

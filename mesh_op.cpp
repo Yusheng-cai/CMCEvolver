@@ -222,6 +222,9 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("InterfacialFE_minimization_boundary", "-op InterfacialFE_minimization_boundary -box xyz -maxstep -o -shape",\
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min_boundary(cmd);}, \
                                            mapF, mapU);
+    RegisterAction("InterfacialFE_minimization_boundary_k", "-op InterfacialFE_minimization_boundary_k -box xyz -maxstep -o -shape",\
+                                           [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min_boundary_k(cmd);}, \
+                                           mapF, mapU);
     RegisterAction("InterfacialFE_minimization_boundary_V", "-op InterfacialFE_minimization_boundary_V -box xyz -maxstep -o -shape -target_V", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min_boundary_L1_constraint(cmd);},\
                                            mapF, mapU);
