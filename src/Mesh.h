@@ -421,6 +421,7 @@ namespace MeshTools
 
     void CalculateContactAngle(Mesh& m, AFP_shape* s, std::vector<Real>& ca, bool use_Numerical=true);
     void CalculateContactAngleDerivative(Mesh& m, AFP_shape* s, std::vector<Real>& ca, Real k0, Real3 Volume_shift={0,0,0}, bool use_Numerical=true);
+    void CalculateContactAngleDerivative(Mesh& m, AFP_shape* s, std::vector<Real>& ca, Real k0, std::vector<Real>& ulist, Real3 Volume_shift={0,0,0}, bool use_Numerical=true);
 
     void CalculateAVnbs(Mesh& m, AFP_shape* s, std::vector<int>& BoundaryIndices, std::vector<Real>& ulist,\
                         std::vector<Real>& vlist, Real& A, Real& V, int v_num=1000, bool useNumerical=true, Real3 Vshift={0,0,0});
@@ -439,4 +440,9 @@ namespace MeshTools
     Real CalculatePbar(Mesh& m, const std::vector<int>& BoundaryIndices, std::vector<Real3>& tdr);
 
     Real CalculateAbar(Mesh& m);
+
+    Real ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real max_k, Real goal_CA, Real tolerance=1e-3);
+    void WriteInterfaciaMinBoundaryOutput(std::string outputfname, Mesh& m, AFP_shape* shape, std::vector<Real>& v_list,  std::vector<Real>& vnbs_list, \
+                                          std::vector<Real>& a_list, std::vector<Real>& anbs_list, std::vector<Real>& k_list, \
+                                          std::vector<Real>& L2_list, std::vector<Real>& vtot_list, Real3 Volume_shift);
 };

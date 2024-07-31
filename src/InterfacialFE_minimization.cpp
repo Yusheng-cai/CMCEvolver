@@ -102,7 +102,6 @@ void InterfacialFE_minimization::setSquaredGradients(Mesh& m){
 
 
 void InterfacialFE_minimization::refine(Mesh& mesh){
-    std::cout << "k = " << rho_ * (mu_ + L_) / (2*gamma_) << std::endl;
     // define mesh
     mesh_ = &mesh;
     mesh_->CalcVertexNormals();
@@ -199,12 +198,6 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
             MeshTools::ChangeWindingOrderPosZ(*mesh_);
 
             update_Mesh(*mesh_);
-
-            // if (max_avg_ratio > 10){
-            //     std::cout << "max step = " << max << std::endl;
-            //     std::cout << "average = " << avg_step << std::endl;
-            //     std::cout << "Optimzied because of max avg ratio" << std::endl;
-            // }
         }
     }
 
@@ -331,12 +324,12 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 contact_angle_list.push_back(ca);
 
                 // // update vlist 
-                // Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
-                // Real3 shift_vec;
-                // curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
-                // new_p = new_p + shift_vec;
-                // verts[ind].position_ = new_p;
-                verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
+                Real3 shift_vec;
+                curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
+                new_p = new_p + shift_vec;
+                verts[ind].position_ = new_p;
+                //verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];

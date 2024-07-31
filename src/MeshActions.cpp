@@ -130,15 +130,23 @@ void MeshActions::CalculateContactAngle(CommandLineArguments& cmd){
 
     // read the afp shape
     std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
-    std::vector<Real> ca;
+    std::vector<Real> ca, ulist;
 
     if (useDerivative){
-        MeshTools::CalculateContactAngleDerivative(m, shape.get(), ca, k0, -0.5 * box, useNumerical);
+        MeshTools::CalculateContactAngleDerivative(m, shape.get(), ca, k0, ulist, -0.5 * box, useNumerical);
+        std::ofstream ofs;
+        ofs.open(outputfname);
+
+        for (int i=0;i<ulist.size();i++){
+            ofs << ulist[i] << " " << ca[i] << "\n";
+        }
+
+        ofs.close();
     }
     else{
         MeshTools::CalculateContactAngle(m, shape.get(), ca, useNumerical);
+        StringTools::WriteTabulatedData(outputfname, ca);
     }
-    StringTools::WriteTabulatedData(outputfname, ca);
 }
 
 void MeshActions::FindEdgeLength(CommandLineArguments& cmd){
@@ -2241,7 +2249,8 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     std::string inputfname, outputfname="evolved.ply";
     std::string MaxStepCriteria="true";
     Real3 box;
-    Real init_k=0.0, max_k_percentage=0.95, Shooting_Step=1.0, Shooting_first_step=0.05;
+    Real init_k=0.0, max_k_percentage=0.95, Shooting_Step=1.0, Shooting_first_step=0.05, init_k_percentage=0.0;
+    bool guess_init_k=false;
 
     // read input
     cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
@@ -2249,7 +2258,9 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     cmd.readValue("max_k_percentage", CommandLineArguments::Keys::Optional, max_k_percentage);
     cmd.readValue("Shooting_Step", CommandLineArguments::Keys::Optional, Shooting_Step);
     cmd.readValue("Shooting_first_Step", CommandLineArguments::Keys::Optional, Shooting_first_step);
-    bool NotPerformShooting = cmd.readValue("init_k", CommandLineArguments::Keys::Optional, init_k);
+    cmd.readValue("init_k_percentage", CommandLineArguments::Keys::Optional, init_k_percentage);
+    cmd.readBool("guess_init_k", CommandLineArguments::Keys::Optional, guess_init_k);
+
 
     // initialize the shape
     std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
@@ -2266,10 +2277,12 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     Real rho   = temp_r->getrho();
     Real mu    = temp_r->getmu();
     Real gamma = temp_r->getgamma();
+    Real dgg   = temp_r->getdgg();
 
     // volume shift
     Real3 Volume_shift = -0.5 * box;
     std::vector<Real> k_list, L2_list, v_list, vnbs_list, anbs_list, a_list, vtot_list;
+    Real k1, k2;
 
     // first calculate the boundary averages
     Real avg_z     = MeshTools::CalculateBoundaryAverageHeight(m);
@@ -2278,11 +2291,19 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     Real k_max     = max_k_percentage * P_contact / (2.0f * (box[0] * box[1] - A_contact));
 
     // set the first 2 k0's
-    Real k1, k2;
-    k1 = init_k; k2 = init_k + Shooting_first_step;
-    ASSERT((std::abs(k1) < k_max && std::abs(k2) < k_max), "The inputted curvature " << init_k << " exceeded max curvature " << k_max);
+    // first let's see if we are guess init_k
+    if (guess_init_k){
+        std::cout << "we are guessing init k." << std::endl;
+        Mesh temp_m = m;
+        k1 = MeshTools::ShootingMethod_CA(temp_m, shape.get(), r.get(), Volume_shift, 0, 0.05, k_max, dgg);
+    }
+    else{
+        k1 = init_k_percentage * k_max;
+    }
 
     // first iteration of shooting method --> first set temp_r to m
+    ASSERT((std::abs(k1) < k_max), "The inputted curvature " << k1 << " exceeded max curvature " << k_max);
+    std::cout << "Performing k1 = " << k1 << std::endl;
     temp_m = m;
     temp_r->setK(k1);
     temp_r->refineBoundary(temp_m, shape.get());
@@ -2292,6 +2313,22 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     vnbs_list.push_back(temp_r->getVnbs());
     anbs_list.push_back(temp_r->getAnbs());
     vtot_list.push_back(temp_r->getVunderneath() - temp_r->getVnbs_underneath());
+    k_list.push_back(k1);
+
+    if (std::abs(L2_list[0]) < 1e-4){
+        // set m to to be temp_m
+        m = temp_m; 
+        MeshTools::WriteInterfaciaMinBoundaryOutput(outputfname, m, shape.get(), v_list, vnbs_list, \
+                                                    a_list, anbs_list, k_list, L2_list, vtot_list, Volume_shift);
+        return;
+    }
+
+    // set k2
+    // if the previous L2 is larger than 0, then we use slightly smaller k2 else larger
+    if (temp_r->getL2() > 0){k2 = k1 - Shooting_first_step;}
+    else{k2 = k1 + Shooting_first_step;}
+    ASSERT((std::abs(k2) < k_max), "The inputted curvature " << k1 << " exceeded max curvature " << k_max);
+    std::cout << "Performing k2 = " << k2 << std::endl;
 
     temp_m = m;
     temp_r->setK(k2);
@@ -2302,13 +2339,19 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     vnbs_list.push_back(temp_r->getVnbs());
     anbs_list.push_back(temp_r->getAnbs());
     vtot_list.push_back(temp_r->getVunderneath() - temp_r->getVnbs_underneath());
+    k_list.push_back(k2);
 
-    k_list.push_back(k1); k_list.push_back(k2);
+    // L2 list
+    if (std::abs(L2_list[1]) < 1e-4){
+        // set m to to be temp_m
+        m = temp_m; 
+        MeshTools::WriteInterfaciaMinBoundaryOutput(outputfname, m, shape.get(), v_list, vnbs_list, \
+                                                    a_list, anbs_list, k_list, L2_list, vtot_list, Volume_shift);
+        return;
+    }
 
-    // calculate the derivative
+    // start the shooting step if the previous 2 did not converge 
     int ind = 0;
-    Real deriv  = (k_list[ind+1] - k_list[ind]) / (L2_list[ind+1] - L2_list[ind]);
-
     while(true){
         std::cout << "L2_list = " << L2_list << std::endl;
 
@@ -2370,26 +2413,8 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     }
     
     // obtain the file name -->  a.ply --> a 
-    std::string fname = StringTools::ReadFileName(outputfname);
-
-    // write the ply file
-    MeshTools::writePLY(outputfname, m);
-
-    // write the volume and area
-    StringTools::WriteTabulatedData(fname + "_volume.out", v_list);
-    StringTools::WriteTabulatedData(fname + "_vnbs.out", vnbs_list);
-    StringTools::WriteTabulatedData(fname + "_area.out", a_list);
-    StringTools::WriteTabulatedData(fname + "_anbs.out", anbs_list);
-    StringTools::WriteTabulatedData(fname + "_k.out", k_list);
-    StringTools::WriteTabulatedData(fname + "_L2.out", L2_list);
-    StringTools::WriteTabulatedData(fname + "_Vtot.out", vtot_list);
-
-    // // write the contact angle
-    std::vector<Real> ca_list_deriv, ca_list_NS;
-    MeshTools::CalculateContactAngleDerivative(m, shape.get(), ca_list_deriv, k_list[k_list.size()-1], Volume_shift);
-    MeshTools::CalculateContactAngle(m, shape.get(), ca_list_NS);
-    StringTools::WriteTabulatedData(fname + "_ca_deriv.out", ca_list_deriv);
-    StringTools::WriteTabulatedData(fname + "_ca_NdotS.out", ca_list_NS);
+    MeshTools::WriteInterfaciaMinBoundaryOutput(outputfname, m, shape.get(), v_list, vnbs_list, \
+                                                a_list, anbs_list, k_list, L2_list, vtot_list, Volume_shift);
 }
 
 void MeshActions::InterfacialFE_min_boundary_range(CommandLineArguments& cmd){

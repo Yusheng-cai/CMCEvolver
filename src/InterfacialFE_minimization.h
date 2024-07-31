@@ -53,6 +53,7 @@ class InterfacialFE_minimization : public MeshRefineStrategy{
         Real getAnbs() {return Anbs_list_[Anbs_list_.size()-1];}
         Real getVunderneath() {return Vunderneath_;}
         Real getVnbs_underneath() {return Vnbs_underneath_;}
+        Real getdgg() {return dgamma_gamma_;}
         Mesh getMeshFlatContact() {return m_flatContact_;}
 
         void setL(Real L) {L_=L;}

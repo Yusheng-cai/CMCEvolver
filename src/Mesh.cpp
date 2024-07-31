@@ -1,3 +1,4 @@
+#include "InterfacialFE_minimization.h"
 #include "Mesh.h"
 
 Mesh::Mesh(const std::vector<Real3>& v, const std::vector<INT3>& f){
@@ -3184,6 +3185,46 @@ void MeshTools::CalculateContactAngle(Mesh& m, AFP_shape* shape, std::vector<Rea
 }
 
 void MeshTools::CalculateContactAngleDerivative(Mesh& m, AFP_shape* shape, \
+                                std::vector<Real>& ca_list, Real k0, std::vector<Real>& ulist, Real3 Volume_shift, bool useNumerical){
+    ulist.clear();
+
+    // calculate area derivative --> dAdr at the boundary and volume derivative dVdr 
+    std::vector<Real3> dAdr ,dVdr;
+    MeshTools::CalculateAreaDerivatives(m, dAdr);
+    MeshTools::CalculateVolumeDerivatives(m, dVdr, Volume_shift);
+
+    // calculate drdu, drdv, boundaryindices, dAnbsdv, dAnbsdu, dVnbsdv, dVnbsdu
+    std::vector<int> BoundaryIndices;
+    std::vector<Real2> dAnbsduv, dVnbsduv;
+    std::vector<Real3> drdu, drdv;
+    std::vector<Real> vlist;
+    MeshTools::CalculatedAVnbsdUV(m, shape, BoundaryIndices, ulist, \
+                                vlist, drdu, drdv, dAnbsduv, dVnbsduv, useNumerical, Volume_shift);
+    ca_list.clear();
+
+    for (int j=0;j<BoundaryIndices.size();j++){
+        // get the actual index of boundary
+        int ind = BoundaryIndices[j];
+
+        Real dAdu = LinAlg3x3::DotProduct(drdu[j], dAdr[ind]);
+        Real dAdv = LinAlg3x3::DotProduct(drdv[j], dAdr[ind]);
+
+        Real dVdu = LinAlg3x3::DotProduct(drdu[j], dVdr[ind]);
+        Real dVdv = LinAlg3x3::DotProduct(drdv[j], dVdr[ind]);
+
+        // calculate dAnbsdu and dAnbsdv --> keep drdv the same 
+        Real dAnbsdu  = dAnbsduv[j][0];
+        Real dAnbsdv  = dAnbsduv[j][1];
+        Real dVnbsdu  = dVnbsduv[j][0];
+        Real dVnbsdv  = dVnbsduv[j][1];
+
+        // we can calculate the contact angle by finding the dgamma_gamma where dEdv is 0
+        Real ca = 1.0 / dAnbsdv * (-dAdv + 2.0f * k0 * (dVdv + dVnbsdv));
+        ca_list.push_back(ca);
+    }
+}
+
+void MeshTools::CalculateContactAngleDerivative(Mesh& m, AFP_shape* shape, \
                                 std::vector<Real>& ca_list, Real k0, Real3 Volume_shift, bool useNumerical){
     // calculate area derivative --> dAdr at the boundary and volume derivative dVdr 
     std::vector<Real3> dAdr ,dVdr;
@@ -3425,3 +3466,107 @@ void MeshTools::CalculateEdgeLength(Mesh& m, std::map<INT2,Real>& edgeLength){
 
 }
 
+Real MeshTools::ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real k_max, Real goal_CA, Real tolerance){
+    // get a list of contact angles, curvature
+    InterfacialFE_minimization* temp_r = dynamic_cast<InterfacialFE_minimization*>(r);
+
+    std::vector<Real> ca_list_track, k_list, ca_list_deriv;
+    Real guess1 = init_k;
+    Real guess2 = init_k + init_step;
+    std::cout << "Guess1 = " << guess1 << std::endl;
+    std::cout << "Guess2 = " << guess2 << std::endl;
+    std::cout << "max k  = " << k_max << std::endl;
+
+    // first iteration of shooting method
+    Mesh temp_m = m;
+    temp_r->setK(guess1);
+    temp_r->refine(temp_m);
+    k_list.push_back(guess1);
+    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess1, Volume_shift);
+    ca_list_track.push_back(Algorithm::calculateMean(ca_list_deriv));
+
+    if (std::abs(ca_list_track[0] - goal_CA) < tolerance){
+        return guess1;
+    }
+
+    // second iteration of shooting method
+    temp_m = m;
+    temp_r->setK(guess2);
+    temp_r->refine(temp_m);
+    k_list.push_back(guess2);
+    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess2, Volume_shift);
+    ca_list_track.push_back(Algorithm::calculateMean(ca_list_deriv));
+
+    if (std::abs(ca_list_track[1] - goal_CA) < tolerance){
+        return guess2;
+    }
+
+    std::cout << "k list = " << k_list << std::endl;
+    std::cout << "ca list = " << ca_list_track << std::endl;
+
+    int ind = 0;
+    while (true){
+        // reset the mesh
+        temp_m = m;
+
+        // calculate the derivative
+        Real dkdca  = (k_list[ind+1] - k_list[ind]) / (ca_list_track[ind+1] - ca_list_track[ind]);
+        Real k0_st_next;
+
+        // take steps carefully to ensure that we do not go above the maximum allowed curvature
+        Real step_size = 1.0;
+        do{
+            k0_st_next = k_list[ind+1] + step_size * dkdca * (goal_CA - ca_list_track[ind+1]);
+            step_size *= 0.75;
+        }
+        while(std::abs(k0_st_next) > k_max);
+
+        // set curvature and refine the mesh
+        std::cout << "k0_st_next = " << k0_st_next << std::endl;
+        temp_r->setK(k0_st_next);
+        temp_r->refine(temp_m);
+        // calculate contact angle using derivative method
+        MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, k0_st_next, Volume_shift);
+
+        // keep track of the curvature 
+        k_list.push_back(k0_st_next);
+        Real mean_ca = Algorithm::calculateMean(ca_list_deriv);
+
+        if (std::abs(mean_ca - goal_CA) < tolerance){
+            return k0_st_next;
+        }
+
+        ca_list_track.push_back(mean_ca);
+        ind++;
+
+        std::cout << "k list = " << k_list << std::endl;
+        std::cout << "ca list = " << ca_list_track << std::endl;
+    }
+}
+
+void MeshTools::WriteInterfaciaMinBoundaryOutput(std::string outputfname, Mesh& m, AFP_shape* shape, std::vector<Real>& v_list,  std::vector<Real>& vnbs_list, \
+                                          std::vector<Real>& a_list, std::vector<Real>& anbs_list, std::vector<Real>& k_list, \
+                                          std::vector<Real>& L2_list, std::vector<Real>& vtot_list, Real3 Volume_shift)
+{
+    // obtain the file name -->  a.ply --> a 
+    std::string fname = StringTools::ReadFileName(outputfname);
+
+    // write the ply file
+    MeshTools::writePLY(outputfname, m);
+
+    // write the volume and area
+    StringTools::WriteTabulatedData(fname + "_volume.out", v_list);
+    StringTools::WriteTabulatedData(fname + "_vnbs.out", vnbs_list);
+    StringTools::WriteTabulatedData(fname + "_area.out", a_list);
+    StringTools::WriteTabulatedData(fname + "_anbs.out", anbs_list);
+    StringTools::WriteTabulatedData(fname + "_k.out", k_list);
+    StringTools::WriteTabulatedData(fname + "_L2.out", L2_list);
+    StringTools::WriteTabulatedData(fname + "_Vtot.out", vtot_list);
+
+    // // write the contact angle
+    std::vector<Real> ca_list_deriv, ca_list_NS;
+    MeshTools::CalculateContactAngleDerivative(m, shape, ca_list_deriv, k_list[k_list.size()-1], Volume_shift);
+    MeshTools::CalculateContactAngle(m, shape, ca_list_NS);
+    StringTools::WriteTabulatedData(fname + "_ca_deriv.out", ca_list_deriv);
+    StringTools::WriteTabulatedData(fname + "_ca_NdotS.out", ca_list_NS);
+}
