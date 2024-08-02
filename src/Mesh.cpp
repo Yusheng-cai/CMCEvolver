@@ -2426,6 +2426,7 @@ MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::
     const auto& faces = m.gettriangles();
 
     Real volume = 0.0f;
+    Real3 box   = m.getBoxLength();
 
     // iterate over faces
     for (int i=0;i<faces.size();i++){
@@ -2455,6 +2456,10 @@ MeshTools::Real MeshTools::CalculateVolumeDivergenceTheorem(Mesh& m, const std::
             v0 = verts[faces[i][0]].position_; v1 = verts[faces[i][1]].position_; v2 = verts[faces[i][2]].position_;
             centroid = 1.0 / 3.0 * (v0 + v1 + v2);
         }
+
+        // calculate shift 
+        Real3 shift = MeshTools::calculateShift(centroid, 0.5 * box, box);
+        centroid = centroid + shift;
 
         // get the volume
         volume += 1.0 / 3.0 * LinAlg3x3::DotProduct(centroid, Normal[i]) * vecArea[i];

@@ -177,9 +177,6 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
         if (MaxStepCriteria){if (max < tol_){break;}}
         else{if (avg_step < tol_){break;}}
 
-        // max to average step ratio
-        Real max_avg_ratio = max / avg_step;
-
         // print if necessary
         if ((i+1) % print_every == 0){
             std::vector<Real3> Normal;
@@ -324,12 +321,12 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 contact_angle_list.push_back(ca);
 
                 // // update vlist 
-                Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
-                Real3 shift_vec;
-                curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
-                new_p = new_p + shift_vec;
-                verts[ind].position_ = new_p;
-                //verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                //Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
+                //Real3 shift_vec;
+                //curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
+                //new_p = new_p + shift_vec;
+                //verts[ind].position_ = new_p;
+                verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];
