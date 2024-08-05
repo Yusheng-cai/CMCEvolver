@@ -53,6 +53,7 @@ InterfacialFE_minimization::InterfacialFE_minimization(MeshRefineStrategyInput& 
     pack_.ReadNumber("zstar_deviation", ParameterPack::KeyType::Optional, zstar_deviation_);
     pack_.Readbool("useNumerical", ParameterPack::KeyType::Optional, useNumerical_);
     pack_.Readbool("debug", ParameterPack::KeyType::Optional, debug_);
+    pack_.Readbool("use_better_L2_update", ParameterPack::KeyType::Optional, use_better_L2_update_);
 
     // calculate mu and gamma based on temperature
     mu_ = CalculateMu(temperature_);
@@ -412,7 +413,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
         }
 
         // if we are on the first step --> then we make a better guess
-        if (num_L2_step == 0){
+        if (num_L2_step == 0 && use_better_L2_update_){
             if (exceed_zstar_deviation){
                 L2_ = L2_g;
             }
