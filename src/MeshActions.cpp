@@ -2261,7 +2261,6 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     cmd.readValue("init_k_percentage", CommandLineArguments::Keys::Optional, init_k_percentage);
     cmd.readBool("guess_init_k", CommandLineArguments::Keys::Optional, guess_init_k);
 
-
     // initialize the shape
     std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
     refineptr r = MeshTools::ReadInterfacialMinBoundary(cmd);

@@ -180,6 +180,7 @@ class SuperEgg : public AFP_shape{
         Real a_;
         Real b_;
         Real n_=4;
+        Real n_taper_=2.0;
         Real zmax_=1.5;
         Real a_taper_=1.0;
         Real b_taper_=0.5;

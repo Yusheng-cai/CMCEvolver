@@ -2649,7 +2649,7 @@ std::unique_ptr<AFP_shape> MeshTools::ReadAFPShape(CommandLineArguments& cmd){
     std::unique_ptr<AFP_shape> shape;
 
     if (shape_name == "SuperEgg"){
-        std::string a,b,n,zmax,a_taper,b_taper,a_alpha,b_alpha;
+        std::string a,b,n,n_taper,zmax,a_taper,b_taper,a_alpha,b_alpha;
         std::vector<std::string> center;
         bool read;
         cmd.readValue("a", CommandLineArguments::Keys::Required, a);
@@ -2663,6 +2663,10 @@ std::unique_ptr<AFP_shape> MeshTools::ReadAFPShape(CommandLineArguments& cmd){
         read = cmd.readValue("n", CommandLineArguments::Keys::Optional, n);
         if (read){
             shapePack.insert("n", n);
+        }
+        read = cmd.readValue("n_taper", CommandLineArguments::Keys::Optional, n_taper);
+        if (read){
+            shapePack.insert("n_taper", n_taper);
         }
         read = cmd.readValue("a_taper", CommandLineArguments::Keys::Optional, a_taper);
         if (read){

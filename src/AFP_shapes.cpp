@@ -400,6 +400,7 @@ SuperEgg::SuperEgg(const ParameterPack& pack) : AFP_shape(pack){
     pack.ReadNumber("a", ParameterPack::KeyType::Required, a_);
     pack.ReadNumber("b", ParameterPack::KeyType::Required, b_);
     pack.ReadNumber("n", ParameterPack::KeyType::Optional, n_);
+    pack.ReadNumber("n_taper", ParameterPack::KeyType::Optional, n_taper_);
     pack.ReadNumber("zmax", ParameterPack::KeyType::Optional, zmax_);
     pack.ReadNumber("a_taper", ParameterPack::KeyType::Optional, a_taper_);
     pack.ReadNumber("b_taper", ParameterPack::KeyType::Optional, b_taper_);
@@ -416,15 +417,15 @@ SuperEgg::SuperEgg(const ParameterPack& pack) : AFP_shape(pack){
 }
 
 Real SuperEgg::aBulging(Real z){
-    return a_ * (1 - std::pow((a_taper_ * z / zmax_),2)) + a_alpha_ * std::sin(z / zmax_ * Constants::PI);
+    return a_ * (1 - a_taper_ * std::pow(z / zmax_, n_taper_)) + a_alpha_ * std::sin(z / zmax_ * Constants::PI);
 }
 
 Real SuperEgg::da_dz(Real z){
-    return a_ * a_taper_ * z / zmax_ * a_taper_ / zmax_ + a_alpha_ * std::cos(z / zmax_ * Constants::PI) * Constants::PI / zmax_;
+    return a_ * a_taper_ * (n_taper_-1) * z / zmax_ + a_alpha_ * std::cos(z / zmax_ * Constants::PI) * Constants::PI / zmax_;
 }
 
 Real SuperEgg::bBulging(Real z){
-    return b_ * (1 - std::pow((b_taper_ * z / zmax_),2)) + b_alpha_ * std::sin(z / zmax_ * Constants::PI);
+    return b_ * (1 - b_taper_ * std::pow(z / zmax_,n_taper_)) + b_alpha_ * std::sin(z / zmax_ * Constants::PI);
 }
 
 Real SuperEgg::db_dz(Real z){
