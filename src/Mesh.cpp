@@ -3290,6 +3290,22 @@ MeshTools::Real MeshTools::CalculateBoundaryAverageHeight(Mesh& m){
     return z_height;
 }
 
+MeshTools::Real MeshTools::CalculateBoundaryAverageHeight(Mesh& m, const std::vector<int>& BoundaryIndices){
+    Real z_height = 0.f;
+    const auto& verts = m.getvertices();
+
+    for (int i=0;i<BoundaryIndices.size();i++){
+        int ind = BoundaryIndices[i];
+        z_height += verts[ind].position_[2];
+    }
+
+    z_height = z_height / (Real)BoundaryIndices.size();
+
+    return z_height;
+}
+
+
+
 void MeshTools::CalculateAV(Mesh& m, Real& A, Real& V){
     std::vector<Real> vecArea;
     std::vector<Real3> Normal;
@@ -3477,7 +3493,7 @@ void MeshTools::CalculateEdgeLength(Mesh& m, std::map<INT2,Real>& edgeLength){
 
 }
 
-Real MeshTools::ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real k_max, Real goal_CA, Real tolerance){
+bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real k_max, Real goal_CA, Real tolerance){
     // get a list of contact angles, curvature
     InterfacialFE_minimization* temp_r = dynamic_cast<InterfacialFE_minimization*>(r);
 
@@ -3520,6 +3536,11 @@ Real MeshTools::ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy*
         // reset the mesh
         temp_m = m;
 
+        // if we are not making much progress in contact angle, return --> if it's too small, we also will have nan values
+        if (std::abs(ca_list_track[ind+1] - ca_list_track[ind]) < 1e-8){
+            return false;
+        }
+
         // calculate the derivative
         Real dkdca  = (k_list[ind+1] - k_list[ind]) / (ca_list_track[ind+1] - ca_list_track[ind]);
         Real k0_st_next;
@@ -3544,7 +3565,8 @@ Real MeshTools::ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy*
         Real mean_ca = Algorithm::calculateMean(ca_list_deriv);
 
         if (std::abs(mean_ca - goal_CA) < tolerance){
-            return k0_st_next;
+            k = k0_st_next;
+            break;
         }
 
         ca_list_track.push_back(mean_ca);
@@ -3553,6 +3575,8 @@ Real MeshTools::ShootingMethod_CA(Mesh& m, AFP_shape* shape, MeshRefineStrategy*
         std::cout << "k list = " << k_list << std::endl;
         std::cout << "ca list = " << ca_list_track << std::endl;
     }
+
+    return true;
 }
 
 void MeshTools::WriteInterfaciaMinBoundaryOutput(std::string outputfname, Mesh& m, AFP_shape* shape, std::vector<Real>& v_list,  std::vector<Real>& vnbs_list, \

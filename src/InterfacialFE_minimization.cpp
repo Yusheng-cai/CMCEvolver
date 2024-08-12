@@ -287,6 +287,9 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             Real kk                 = rho_ * (L_ + mu_) / (2*gamma_);
             mean_z                  = 0.0;
 
+            // calculate average z 
+            Real avg_z = MeshTools::CalculateBoundaryAverageHeight(curr_m, BoundaryIndices);
+
             // pib refinement
             for (int j=0;j<BoundaryIndices.size();j++){
                 // get the actual index of boundary
@@ -305,7 +308,9 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 Real dVnbsdv  = dVnbsduv[j][1];
 
                 // calculate dEdv
-                Real dEdv     = dAdv - rho_ * (L_ + mu_) / gamma_* (dVdv + dVnbsdv) + dgamma_gamma_ * dAnbsdv + L2_ * drdv[j][2] / (Real)N;
+                Real davgz_dv = drdv[j][2] / (Real)N;
+                Real dEdv     = dAdv - rho_ * (L_ + mu_) / gamma_* (dVdv + dVnbsdv) + dgamma_gamma_ * dAnbsdv - L2_ * davgz_dv + \
+                                L2_stepsize_ * (avg_z - zstar_) * davgz_dv;
                 if (cont_ind == 0){
                     L2_g      += (-dAdv + rho_ * (L_ + mu_) / gamma_ * (dVdv + dVnbsdv) - dgamma_gamma_ * dAnbsdv) / (drdv[j][2]);
                 }
@@ -375,7 +380,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             std::cout << "Zstar deviation = " << zstar_deviation_ << std::endl;
 
             if (debug_){
-                MeshTools::writePLY("debugBoundary_" + std::to_string(num_L2_step) + "_" + std::to_string(cont_ind) + ".ply" , curr_m);
+                MeshTools::writePLY("debugBoundary_" + std::to_string(L_) + "_" + std::to_string(num_L2_step) + "_" + std::to_string(cont_ind) + ".ply" , curr_m);
                 std::cout << "we are now going to optimize debugBoundary " << std::to_string(num_L2_step) << "_" << std::to_string(cont_ind) << "\n"; 
             }
 
@@ -403,6 +408,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             iteration++;
         }
 
+        // augmented lagrange multiplier
         Real L2_step = (mean_z - zstar_);
         L2_list_.push_back(L2_);
 
@@ -419,9 +425,9 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             }
         }
         else{
-            Real updated_L2 = L2_ + L2_stepsize_ * L2_step;
+            Real updated_L2 = L2_ - L2_stepsize_ * L2_step;
             if (std::abs(updated_L2 - last_L2) < L2tol_ * L2_stepsize_){
-                updated_L2 = L2_ + L2_stepsize_ * 0.5 * L2_step;
+                updated_L2 = L2_ - L2_stepsize_ * 0.5 * L2_step;
             }
 
             last_L2 = L2_;

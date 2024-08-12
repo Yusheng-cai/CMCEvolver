@@ -2292,9 +2292,16 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     // set the first 2 k0's
     // first let's see if we are guess init_k
     if (guess_init_k){
+        std::cout << "-----------------------" << std::endl;
         std::cout << "we are guessing init k." << std::endl;
         Mesh temp_m = m;
-        k1 = MeshTools::ShootingMethod_CA(temp_m, shape.get(), r.get(), Volume_shift, 0, 0.05, k_max, dgg);
+        bool converged = MeshTools::ShootingMethod_CA(k1, temp_m, shape.get(), r.get(), Volume_shift, 0, 0.05, k_max, dgg);
+        if (! converged){
+            std::cout << "Surface is not possible." << std::endl;
+            return;
+        }
+        std::cout << "Done guessing init k" << std::endl;
+        std::cout << "---------------------" << std::endl;
     }
     else{
         k1 = init_k_percentage * k_max;
