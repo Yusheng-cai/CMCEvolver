@@ -1912,6 +1912,52 @@ void MeshTools::FindTriangleAngles(const Mesh& mesh, std::vector<Real>& angles){
     }
 }
 
+void MeshTools::FindNonBoundaryTriangleAngles(const Mesh& mesh,const std::vector<bool>& BoundaryIndicator, std::vector<Real>& angles){
+    angles.clear();
+
+    const auto& tri = mesh.gettriangles();
+    const auto& vert = mesh.getvertices();
+
+    #pragma omp parallel
+    {
+        std::vector<Real> localAngles;
+        #pragma omp for
+        for (int i=0;i<tri.size();i++){
+            triangle ti = tri[i];
+            bool b1, b2, b3;
+            b1 = MeshTools::IsBoundary(ti[0], BoundaryIndicator);
+            b2 = MeshTools::IsBoundary(ti[1], BoundaryIndicator);
+            b3 = MeshTools::IsBoundary(ti[2], BoundaryIndicator);
+
+            if ((! b1) && (!b2) && (!b3)){
+                // for each triangle we have 3 angles 
+                for (int j=0;j<3;j++){
+                    int next = (j+1) % 3;
+                    int before  = j-1;
+
+                    if (before < 0){
+                        before  += 3;
+                    }
+
+                    // find the 2 vectors of the triangle
+                    Real3 vec1, vec2;
+                    Real dist1, dist2;
+                    mesh.getVertexDistance(vert[ti[next]], vert[ti[j]], vec1, dist1);
+                    mesh.getVertexDistance(vert[ti[before]], vert[ti[j]], vec2, dist2);
+                    
+                    Real angle = LinAlg3x3::findAngle(vec1,vec2) * 180 / Constants::PI;
+                    localAngles.push_back(angle);
+                }
+            }
+        }
+
+        #pragma omp critical
+        {
+            angles.insert(angles.end(), localAngles.begin(), localAngles.end());
+        }
+    }
+}
+
 void MeshTools::FindSideLengths(const Mesh& mesh, std::vector<Real>& SideLengths){
     const auto& tri = mesh.gettriangles();
     const auto& v = mesh.getvertices();
@@ -2774,7 +2820,7 @@ void MeshTools::CalculateBoundaryVerticesIndex(const Mesh& mesh, std::vector<int
 
 MeshTools::refineptr MeshTools::ReadInterfacialMin(CommandLineArguments& cmd){
     std::string stepsize, ca_file_output="ca.out", T="298", L="0", maxstep="1e5", tolerance="0.00001", printevery="1000", optimizeevery="1e10";
-    std::string MaxStepCriteria="true";
+    std::string MaxStepCriteria="true", debug="false";
 
     cmd.readString("maxstep", CommandLineArguments::Keys::Optional, maxstep);
     cmd.readString("temperature", CommandLineArguments::Keys::Required, T);
@@ -2784,6 +2830,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMin(CommandLineArguments& cmd){
     cmd.readString("Lagrange", CommandLineArguments::Keys::Optional, L);
     cmd.readString("optimize_every", CommandLineArguments::Keys::Optional, optimizeevery);
     cmd.readString("MaxStepCriteria", CommandLineArguments::Keys::Optional, MaxStepCriteria);
+    cmd.readString("debug", CommandLineArguments::Keys::Optional,debug);
 
     // define parameter packs
     ParameterPack refinePack;
@@ -2796,6 +2843,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMin(CommandLineArguments& cmd){
     refinePack.insert("tolerance", tolerance);
     refinePack.insert("print_every", printevery);
     refinePack.insert("MaxStepCriteria", MaxStepCriteria);
+    refinePack.insert("debug", debug);
     
     // initialize refine ptr
     refineptr r;
@@ -2809,7 +2857,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     std::string stepsize, ca_file_output="ca.out", T="298", L="0", maxstep="1e5", tolerance="0.00001", printevery="1000", optimize_every="1e10";
     std::string boundarymaxstep="10000", boundarystepsize="0.5", boundarytolerance="5e-6", L2tolerance="5e-5", boundary_optimize_every="300";
     std::string MaxStepCriteria="true", boundaryMaxStepCriteria="true", L2="0", L2_step_size="10.0",L2maxstep="1e5", zstar, zstar_deviation="0.003";
-    std::string dgamma_gamma, useNumerical="false", debug="false", use_better_L2_update="true";
+    std::string dgamma_gamma, useNumerical="false", debug="false";
 
     cmd.readString("maxstep", CommandLineArguments::Keys::Optional, maxstep);
     cmd.readString("temperature", CommandLineArguments::Keys::Required, T);
@@ -2835,7 +2883,6 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     cmd.readString("MaxStepCriteria", CommandLineArguments::Keys::Optional, MaxStepCriteria);
     cmd.readString("boundaryMaxStepCriteria", CommandLineArguments::Keys::Optional, boundaryMaxStepCriteria);
     cmd.readString("debug", CommandLineArguments::Keys::Optional,debug);
-    cmd.readString("use_better_L2_update", CommandLineArguments::Keys::Optional, use_better_L2_update);
 
     // define parameter packs
     ParameterPack refinePack;
@@ -2862,7 +2909,6 @@ MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments&
     refinePack.insert("zstar_deviation", zstar_deviation);
     refinePack.insert("L2_step_size", L2_step_size);
     refinePack.insert("L2tolerance", L2tolerance);
-    refinePack.insert("use_better_L2_update", use_better_L2_update);
     
     // initialize refine ptr
     refineptr r;
@@ -3412,7 +3458,7 @@ MeshTools::Real MeshTools::CalculateMaxCurvature(Mesh& m, const std::vector<int>
     return Pbar / (2 * Abar);
 }
 
-MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real& Abar, Real3 Boundary_center){
+MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real& Abar, std::vector<Real>& mdotn, Real3 Boundary_center){
     // calculate the vertex normal of the mesh
     m.CalcVertexNormals();
 
@@ -3424,12 +3470,20 @@ MeshTools::Real MeshTools::CalculateEta(Mesh& m, Real& Pbar, Real& Abar, Real3 B
     const auto& verts = m.getvertices();
     std::vector<Real3> tdr;
     Pbar = MeshTools::CalculatePbar(m, BoundaryIndices,tdr);
+
+    // clear mdotn
+    mdotn.clear();
+
     Real eta=0.0;
     for (int i=0;i<BoundaryIndices.size();i++){
         int vert_ind = BoundaryIndices[i];
         Real3 mvec   = LinAlg3x3::CrossProduct({0,0,1}, tdr[i]);
         Real mdotN   = LinAlg3x3::DotProduct(-1.0 * mvec, verts[vert_ind].normals_);
         eta += mdotN;
+
+        // normalize mvec to obtain the dot product
+        LinAlg3x3::normalize(mvec);
+        mdotn.push_back(LinAlg3x3::DotProduct(verts[vert_ind].normals_, mvec));
     }
 
     eta = eta / Pbar;
@@ -3546,7 +3600,7 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
         Real k0_st_next;
 
         // take steps carefully to ensure that we do not go above the maximum allowed curvature
-        Real step_size = 1.0;
+        Real step_size = 0.75;
         do{
             k0_st_next = k_list[ind+1] + step_size * dkdca * (goal_CA - ca_list_track[ind+1]);
             step_size *= 0.75;
@@ -3557,6 +3611,7 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
         std::cout << "k0_st_next = " << k0_st_next << std::endl;
         temp_r->setK(k0_st_next);
         temp_r->refine(temp_m);
+
         // calculate contact angle using derivative method
         MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, k0_st_next, Volume_shift);
 

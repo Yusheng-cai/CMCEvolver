@@ -53,7 +53,7 @@ InterfacialFE_minimization::InterfacialFE_minimization(MeshRefineStrategyInput& 
     pack_.ReadNumber("zstar_deviation", ParameterPack::KeyType::Optional, zstar_deviation_);
     pack_.Readbool("useNumerical", ParameterPack::KeyType::Optional, useNumerical_);
     pack_.Readbool("debug", ParameterPack::KeyType::Optional, debug_);
-    pack_.Readbool("use_better_L2_update", ParameterPack::KeyType::Optional, use_better_L2_update_);
+    pack_.Readbool("update_boundary_v", ParameterPack::KeyType::Optional, update_boundary_v_);
 
     // calculate mu and gamma based on temperature
     mu_ = CalculateMu(temperature_);
@@ -104,28 +104,27 @@ void InterfacialFE_minimization::setSquaredGradients(Mesh& m){
 
 void InterfacialFE_minimization::refine(Mesh& mesh){
     // define mesh
-    mesh_ = &mesh;
-    mesh_->CalcVertexNormals();
+    mesh.CalcVertexNormals();
 
     FE_.clear();
 
     // first generate necessary things for the mesh
-    update_Mesh(*mesh_);
+    update_Mesh(mesh);
 
     Real3 Volume_shift={0,0,0};
 
-    if (mesh_->isPeriodic()){
-        Volume_shift = -0.5 * mesh_->getBoxLength();
+    if (mesh.isPeriodic()){
+        Volume_shift = -0.5 * mesh.getBoxLength();
     }
 
     // calculate cotangent weights 
     for (int i=0;i<maxStep_;i++){
         // calculate the derivatives dAdpi and dVdpi
-        MeshTools::CalculateCotangentWeights(*mesh_, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdpi_);
-        MeshTools::CalculateVolumeDerivatives(*mesh_, MapVertexToFace_, dVdpi_, Volume_shift);
+        MeshTools::CalculateCotangentWeights(mesh, neighborIndices_, MapEdgeToFace_, MapEdgeToOpposingVerts_, dAdpi_);
+        MeshTools::CalculateVolumeDerivatives(mesh, MapVertexToFace_, dVdpi_, Volume_shift);
     
         // obtain the vertices
-        auto& verts = mesh_->accessvertices();
+        auto& verts = mesh.accessvertices();
 
         // define some variables
         Real max=std::numeric_limits<Real>::lowest();
@@ -173,7 +172,12 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
         avg_step /= total_verts;
 
         // calculate the vertex normals 
-        mesh_->CalcVertexNormals();
+        mesh.CalcVertexNormals();
+
+        // calculate the angles
+        std::vector<Real> angles;
+        MeshTools::FindNonBoundaryTriangleAngles(mesh, boundaryIndicator_, angles);
+        Real min_angle = Algorithm::min(angles);
 
         if (MaxStepCriteria){if (max < tol_){break;}}
         else{if (avg_step < tol_){break;}}
@@ -182,30 +186,48 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
         if ((i+1) % print_every == 0){
             std::vector<Real3> Normal;
             std::vector<Real> vecArea;
-            Real a = MeshTools::CalculateArea(*mesh_, vecArea, Normal);
-            Real V = MeshTools::CalculateVolumeDivergenceTheorem(*mesh_, vecArea, Normal, Volume_shift);
+            Real a = MeshTools::CalculateArea(mesh, vecArea, Normal);
+            Real V = MeshTools::CalculateVolumeDivergenceTheorem(mesh, vecArea, Normal, Volume_shift);
             Real E = a - rho_ * (mu_ + L_) / gamma_ * V;
             FE_.push_back(a - rho_ * (mu_ + L_) / gamma_ * V);
             std::cout << "At iteration " << i+1 << " Area = " << a << " " << " Volume = " << V << " Energy = " << E << std::endl;
             std::cout << "max step = " << max << std::endl;
             std::cout << "Avg step = " << avg_step << std::endl;
+
+            if (debug_){
+                std::string name = "debug_" + std::to_string(L_) + "_" + std::to_string(i+1) + ".ply";
+                std::string angle_name = "debug_" + std::to_string(L_) + "_angles_" + std::to_string(i+1) + ".out"; 
+                MeshTools::writePLY(name, mesh);
+                std::cout << "We are outputting " << name << std::endl; 
+
+                StringTools::WriteTabulatedData(angle_name, angles);
+            }
         }
 
-        if ((i+1) % optimize_every == 0){
-            MeshTools::CGAL_optimize_Mesh(*mesh_, 10, 60);
-            MeshTools::ChangeWindingOrderPosZ(*mesh_);
+        // if (min_angle < 10){
+        //     std::cout << "Optimizing because of min angle." << std::endl;
+        //     MeshTools::CGAL_optimize_Mesh(mesh, 10, 60);
+        //     MeshTools::ChangeWindingOrderPosZ(mesh);
 
-            update_Mesh(*mesh_);
-        }
+        //     update_Mesh(mesh);
+        // }
+
+        // if ((i+1) % optimize_every == 0){
+        //     MeshTools::CGAL_optimize_Mesh(mesh, 10, 60);
+        //     MeshTools::ChangeWindingOrderPosZ(mesh);
+
+        //     update_Mesh(mesh);
+        // }
     }
 
-    mesh_->CalcVertexNormals();
+    mesh.CalcVertexNormals();
 }
 
 void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
+    // first update the mesh to the curvature that we wanted it to be 
     update_Mesh(m);
-    need_update_ = false;
 
+    // clear the list for the items to keep track of 
     area_list_.clear(); volume_list_.clear();
     Vnbs_list_.clear(); Anbs_list_.clear();
     Vunderneath_ = 0.0;
@@ -217,20 +239,19 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
     m_flatContact_ = m;
     this->refine(m_flatContact_);
 
+    // define the volume shift for the mesh for calculating curvature 
     Real3 Volume_shift={0,0,0};
-
     if (m.isPeriodic()){
         Volume_shift = -0.5 * m.getBoxLength();
     }
 
     int num_L2_step=0;
     Real last_L2   =L2_;
+
     // outer loop for Lagrange refinement
     while (true) {
         Real mean_z;
         Real mean_ca;
-
-        // solve for pi*
         int iteration = 0;
         int cont_ind  = 0;
 
@@ -241,6 +262,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
         Real L2_g   = 0.0f;
         bool exceed_zstar_deviation=false;
 
+        // write outputs if debug
         if (debug_){
             MeshTools::writePLY("debugBoundaryStart_" + std::to_string(num_L2_step) + ".ply" , curr_m);
         }
@@ -311,9 +333,6 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 Real davgz_dv = drdv[j][2] / (Real)N;
                 Real dEdv     = dAdv - rho_ * (L_ + mu_) / gamma_* (dVdv + dVnbsdv) + dgamma_gamma_ * dAnbsdv - L2_ * davgz_dv + \
                                 L2_stepsize_ * (avg_z - zstar_) * davgz_dv;
-                if (cont_ind == 0){
-                    L2_g      += (-dAdv + rho_ * (L_ + mu_) / gamma_ * (dVdv + dVnbsdv) - dgamma_gamma_ * dAnbsdv) / (drdv[j][2]);
-                }
 
                 // calculate the inverse jacobian
                 auto invjac   = shape->InvJacobian(ulist[j], vlist[j],useNumerical_);
@@ -327,12 +346,16 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 contact_angle_list.push_back(ca);
 
                 // // update vlist 
-                //Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
-                //Real3 shift_vec;
-                //curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
-                //new_p = new_p + shift_vec;
-                //verts[ind].position_ = new_p;
-                verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                if (update_boundary_v_){
+                    Real3 new_p = shape->calculatePos(ulist[j], vlist[j] - boundarystepsize_ * dEdv);
+                    Real3 shift_vec;
+                    curr_m.CalculateShift(new_p, verts[ind].position_, shift_vec);
+                    new_p = new_p + shift_vec;
+                    verts[ind].position_ = new_p;
+                }
+                else{
+                    verts[ind].position_ = verts[ind].position_ - boundarystepsize_ * step;
+                }
 
                 // update the mean z
                 mean_z += verts[ind].position_[2];
@@ -363,8 +386,8 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             // once we updated the boundary, let's check its perimeter and area again
             Real max_k = MeshTools::CalculateMaxCurvature(curr_m, BoundaryIndices);
             if (std::abs(kk / max_k) > 1.0){
-                std::cout << "Not converged." << std::endl;
-                break;
+                std::cout << "Not converged, curvature exceed what is possible." << std::endl;
+                std::terminate();
             }
 
             Real var  = Algorithm::calculateVariance(contact_angle_list);
@@ -392,6 +415,7 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
                 break;
             }
 
+            // check if we are using the max step or the average step 
             if (boundaryMaxStepCriteria_){
                 if (max_boundary_step < boundarytol_){
                     break;
@@ -418,22 +442,13 @@ void InterfacialFE_minimization::refineBoundary(Mesh& m, AFP_shape* shape){
             break;
         }
 
-        // if we are on the first step --> then we make a better guess
-        if (num_L2_step == 0 && use_better_L2_update_){
-            if (exceed_zstar_deviation){
-                L2_ = L2_g;
-            }
+        // update L2
+        Real updated_L2 = L2_ - L2_stepsize_ * L2_step;
+        if (std::abs(updated_L2 - last_L2) < L2tol_ * L2_stepsize_){
+            updated_L2 = L2_ - L2_stepsize_ * 0.5 * L2_step;
         }
-        else{
-            Real updated_L2 = L2_ - L2_stepsize_ * L2_step;
-            if (std::abs(updated_L2 - last_L2) < L2tol_ * L2_stepsize_){
-                updated_L2 = L2_ - L2_stepsize_ * 0.5 * L2_step;
-            }
-
-            last_L2 = L2_;
-            L2_     = updated_L2;
-        }
-        
+        last_L2 = L2_;
+        L2_     = updated_L2;
         num_L2_step++;
     }
 

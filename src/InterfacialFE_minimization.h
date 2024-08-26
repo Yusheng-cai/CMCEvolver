@@ -116,5 +116,5 @@ class InterfacialFE_minimization : public MeshRefineStrategy{
         Real3 epsilon_={1e-10,1e-10,1e-10};
 
         bool need_update_=true;
-        bool use_better_L2_update_=true;
+        bool update_boundary_v_=false;
 };

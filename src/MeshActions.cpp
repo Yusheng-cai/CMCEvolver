@@ -2333,7 +2333,7 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     // if the previous L2 is larger than 0, then we use slightly smaller k2 else larger
     if (temp_r->getL2() > 0){k2 = k1 - Shooting_first_step;}
     else{k2 = k1 + Shooting_first_step;}
-    ASSERT((std::abs(k2) < k_max), "The inputted curvature " << k1 << " exceeded max curvature " << k_max);
+    ASSERT((std::abs(k2) < k_max), "The inputted curvature " << k2 << " exceeded max curvature " << k_max);
     std::cout << "Performing k2 = " << k2 << std::endl;
 
     temp_m = m;
@@ -2357,6 +2357,8 @@ void MeshActions::InterfacialFE_min_boundary(CommandLineArguments& cmd){
     }
 
     // start the shooting step if the previous 2 did not converge 
+    std::cout << "We have started the shooting step with L2_list = " << L2_list << std::endl;
+    std::cout << "-------------------------------------------" << std::endl;
     int ind = 0;
     while(true){
         std::cout << "L2_list = " << L2_list << std::endl;
@@ -4264,12 +4266,17 @@ void MeshActions::Mesh_Eta(CommandLineArguments& cmd){
     MeshTools::readPLYlibr(inputfname, m);
     if (isPBC) {m.setBoxLength(box);}
 
+    std::string name = StringTools::ReadFileName(outputfname);
+
     Real Pbar, Abar;
-    Real eta = MeshTools::CalculateEta(m, Pbar, Abar, boundary_center);
+    std::vector<Real> mdotn;
+    Real eta = MeshTools::CalculateEta(m, Pbar, Abar, mdotn, boundary_center);
     std::ofstream ofs;
     ofs.open(outputfname);
     ofs << eta << "\n";
     ofs << Pbar << "\n";
     ofs << Abar << "\n";
     ofs.close();
+
+    StringTools::WriteTabulatedData(name + "_mdotn.out", mdotn);
 }

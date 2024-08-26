@@ -346,6 +346,9 @@ namespace MeshTools
     // get a sense of the triangular angles 
     void FindTriangleAngles(const Mesh& mesh, std::vector<Real>& angles);
 
+    // calculate triangle angles without the boundary triangles 
+    void FindNonBoundaryTriangleAngles(const Mesh& mesh, const std::vector<bool>& BoundaryIndicator, std::vector<Real>& angles);
+
     // return distribution of side lengths
     void FindSideLengths(const Mesh& mesh, std::vector<Real>& SideLength);
 
@@ -436,7 +439,7 @@ namespace MeshTools
 
     Real CalculateMaxCurvature(Mesh& m, const std::vector<int>& BoundaryIndices);
 
-    Real CalculateEta(Mesh& m, Real& Pbar, Real& Abar, Real3 Boundary_center={0,0,0});
+    Real CalculateEta(Mesh& m, Real& Pbar, Real& Abar, std::vector<Real>& mdotn, Real3 Boundary_center={0,0,0});
 
     Real CalculatePbar(Mesh& m, const std::vector<int>& BoundaryIndices, std::vector<Real3>& tdr);
 

@@ -566,6 +566,8 @@ Real SuperEgg::CalculateAreaZ(Real z){
         A += pos_list[i][0] * diff[1] - pos_list[i][1] * diff[0];
     }
 
+    std::cout << "Area = " << 0.5 * A << std::endl;
+
     return 0.5 * A;
 }
 
