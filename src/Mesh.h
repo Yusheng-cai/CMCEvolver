@@ -445,7 +445,8 @@ namespace MeshTools
 
     Real CalculateAbar(Mesh& m);
 
-    bool ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real max_k, Real goal_CA, Real tolerance=1e-3);
+    bool ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real max_k, Real goal_CA, \
+                           Real tolerance=1e-3, bool overwrite_original_m=false);
     void WriteInterfaciaMinBoundaryOutput(std::string outputfname, Mesh& m, AFP_shape* shape, std::vector<Real>& v_list,  std::vector<Real>& vnbs_list, \
                                           std::vector<Real>& a_list, std::vector<Real>& anbs_list, std::vector<Real>& k_list, \
                                           std::vector<Real>& L2_list, std::vector<Real>& vtot_list, Real3 Volume_shift);

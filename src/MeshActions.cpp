@@ -2294,9 +2294,8 @@ void MeshActions::InterfacialFE_min_ca(CommandLineArguments& cmd){
 
     std::cout << "-----------------------" << std::endl;
     std::cout << "we are guessing init k." << std::endl;
-    temp_m = m;
-    bool converged = MeshTools::ShootingMethod_CA(k1, temp_m, shape.get(), r.get(), Volume_shift, 0, Shooting_first_step, k_max, dgg, \
-                                                                                                Shooting_tolerance);
+    bool converged = MeshTools::ShootingMethod_CA(k1, m, shape.get(), r.get(), Volume_shift, 0, Shooting_first_step, k_max, dgg, \
+                                                                                                Shooting_tolerance, true);
     if (! converged){
         std::cout << "Surface is not possible." << std::endl;
         return;
@@ -2304,21 +2303,34 @@ void MeshActions::InterfacialFE_min_ca(CommandLineArguments& cmd){
     std::cout << "Done guessing init k" << std::endl;
     std::cout << "---------------------" << std::endl;
 
-    // first iteration of shooting method --> first set temp_r to m
-    ASSERT((std::abs(k1) < k_max), "The inputted curvature " << k1 << " exceeded max curvature " << k_max);
-    std::cout << "Performing k = " << k1 << std::endl;
-    temp_m = m;
-    temp_r->setK(k1);
-    temp_r->refine(temp_m);
-    a_list.push_back(temp_r->getarea());
-    v_list.push_back(temp_r->getvolume());
-    vnbs_list.push_back(temp_r->getVnbs());
-    anbs_list.push_back(temp_r->getAnbs());
-    vtot_list.push_back(temp_r->getVunderneath() - temp_r->getVnbs_underneath());
+    // get the information about the boundary indices 
+    std::vector<int> BoundaryIndices;
+    std::vector<Real> ulist, vlist;
+    Real A,V, Anbs, Vnbs, Vunderneath, Vnbs_underneath;
+    MeshTools::CalculateBoundaryVerticesIndex(m, BoundaryIndices,true);
+    MeshTools::FindBoundaryUV(m, ulist, vlist, BoundaryIndices, shape.get());
+
+    // calculate area and volume after boundary steps
+    std::vector<Real> vecArea;
+    std::vector<Real3> Normal;
+    A = MeshTools::CalculateArea(m, vecArea, Normal);
+    V = MeshTools::CalculateVolumeDivergenceTheorem(m, vecArea, Normal);
+    MeshTools::CalculateAVnbs(m, shape.get(), BoundaryIndices,
+                                ulist, vlist, Anbs, Vnbs,10000, false, Volume_shift);
+
+    a_list.push_back(A);
+    v_list.push_back(V);
+    vnbs_list.push_back(Vnbs);
+    anbs_list.push_back(Anbs);
+
+    Vunderneath     = MeshTools::CalculateVolumeUnderneath(m, 2);
+    Vnbs_underneath = MeshTools::CalculateVnbsUnderneath(m, shape.get(), 2, 10000, false); 
+    vtot_list.push_back(Vunderneath - Vnbs_underneath);
+    L2_list.push_back(0);
     k_list.push_back(k1);
+    std::cout << "done" << std::endl;
 
     // set m to to be temp_m
-    m = temp_m; 
     MeshTools::WriteInterfaciaMinBoundaryOutput(outputfname, m, shape.get(), v_list, vnbs_list, \
                                                 a_list, anbs_list, k_list, L2_list, vtot_list, Volume_shift);
     return;

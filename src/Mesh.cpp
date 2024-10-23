@@ -2856,7 +2856,7 @@ MeshTools::refineptr MeshTools::ReadInterfacialMin(CommandLineArguments& cmd){
 MeshTools::refineptr MeshTools::ReadInterfacialMinBoundary(CommandLineArguments& cmd){
     std::string stepsize, ca_file_output="ca.out", T="298", L="0", maxstep="1e5", tolerance="0.00001", printevery="1000", optimize_every="1e10";
     std::string boundarymaxstep="10000", boundarystepsize="0.5", boundarytolerance="5e-6", L2tolerance="5e-5", boundary_optimize_every="300";
-    std::string MaxStepCriteria="true", boundaryMaxStepCriteria="true", L2="0", L2_step_size="10.0",L2maxstep="1e5", zstar, zstar_deviation="0.003";
+    std::string MaxStepCriteria="true", boundaryMaxStepCriteria="true", L2="0", L2_step_size="10.0",L2maxstep="1e5", zstar="0", zstar_deviation="0.003";
     std::string dgamma_gamma, useNumerical="false", debug="false";
 
     cmd.readString("maxstep", CommandLineArguments::Keys::Optional, maxstep);
@@ -3547,7 +3547,8 @@ void MeshTools::CalculateEdgeLength(Mesh& m, std::map<INT2,Real>& edgeLength){
 
 }
 
-bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, Real k_max, Real goal_CA, Real tolerance){
+bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefineStrategy* r, Real3 Volume_shift, Real init_k, Real init_step, \
+                                  Real k_max, Real goal_CA, Real tolerance, bool overwrite_original_m){
     // get a list of contact angles, curvature
     InterfacialFE_minimization* temp_r = dynamic_cast<InterfacialFE_minimization*>(r);
 
@@ -3629,6 +3630,10 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
 
         std::cout << "k list = " << k_list << std::endl;
         std::cout << "ca list = " << ca_list_track << std::endl;
+    }
+
+    if (overwrite_original_m){
+        m = temp_m;
     }
 
     return true;
