@@ -119,6 +119,8 @@ namespace MeshActions
     // convert a non pbc mesh to pbc mesh
     void ConvertToPBCMesh(CommandLineArguments& cmd);
     
+    // 
+
     // scale mesh by some number 
     void ScaleMesh(CommandLineArguments& cmd);
 
@@ -160,6 +162,8 @@ namespace MeshActions
 
     // curvature evolution but using interfacial Fe
     void InterfacialFE_min(CommandLineArguments& cmd);
+
+    void InterfacialFE_min_ca(CommandLineArguments& cmd);
 
     void InterfacialFE_min_boundary(CommandLineArguments& cmd);
 

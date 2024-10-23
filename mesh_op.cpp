@@ -216,6 +216,9 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("InterfacialFE_minimization", "-op InterfacialFE_minimization -box xyz -maxstep -o", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min(cmd);}, \
                                            mapF, mapU);
+    RegisterAction("InterfacialFE_minimization_ca", "-op InterfacialFE_minimization_ca -i -box -maxstep -o" ,\
+                                           [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min_ca(cmd);},\
+                                           mapF, mapU);
     RegisterAction("CVT_Mesh_Optimization", "-op CVT_Mesh_Optimization -i input.ply" , \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::CVT_Mesh_optimization(cmd);}, \
                                            mapF, mapU);
