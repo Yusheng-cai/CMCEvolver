@@ -3564,7 +3564,7 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
     temp_r->setK(guess1);
     temp_r->refine(temp_m);
     k_list.push_back(guess1);
-    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess1, Volume_shift);
+    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess1, Volume_shift,false);
     ca_list_track.push_back(Algorithm::calculateMean(ca_list_deriv));
 
     if (std::abs(ca_list_track[0] - goal_CA) < tolerance){
@@ -3576,7 +3576,7 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
     temp_r->setK(guess2);
     temp_r->refine(temp_m);
     k_list.push_back(guess2);
-    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess2, Volume_shift);
+    MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, guess2, Volume_shift,false);
     ca_list_track.push_back(Algorithm::calculateMean(ca_list_deriv));
 
     if (std::abs(ca_list_track[1] - goal_CA) < tolerance){
@@ -3614,7 +3614,7 @@ bool MeshTools::ShootingMethod_CA(Real& k, Mesh& m, AFP_shape* shape, MeshRefine
         temp_r->refine(temp_m);
 
         // calculate contact angle using derivative method
-        MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, k0_st_next, Volume_shift);
+        MeshTools::CalculateContactAngleDerivative(temp_m, shape, ca_list_deriv, k0_st_next, Volume_shift,false);
 
         // keep track of the curvature 
         k_list.push_back(k0_st_next);

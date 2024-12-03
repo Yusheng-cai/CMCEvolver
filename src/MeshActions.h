@@ -75,6 +75,9 @@ namespace MeshActions
     // Meshify boundary
     void MeshifyShape(CommandLineArguments& cmd);
 
+    // Meshify infinite boundary
+    void MeshifyInfiniteCylinder(CommandLineArguments& cmd);
+
     // translate a mesh
     void TranslateMesh(CommandLineArguments& cmd);
 

@@ -213,6 +213,9 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("MeshifyShape", "-op MeshifyShape -box x y -num nx ny -shape [Sphere/SuperEgg] -center cx cy cz -z num [SuperEgg]-a a -b b -zmax zmax -ataper ataper -btaper btaper [Circle] -radius -pbc [true/false] -shift_pbc sx sy sz", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::MeshifyShape(cmd);}, \
                                            mapF, mapU);
+    RegisterAction("MeshifyInfiniteCylinder", "-op MeshifyInfiniteCylinder -box x y -num nx ny -center cx cy cz -z num", \
+                                           [](CommandLineArguments& cmd) -> void {return MeshActions::MeshifyInfiniteCylinder(cmd);}, \
+                                           mapF, mapU);
     RegisterAction("InterfacialFE_minimization", "-op InterfacialFE_minimization -box xyz -maxstep -o", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::InterfacialFE_min(cmd);}, \
                                            mapF, mapU);
