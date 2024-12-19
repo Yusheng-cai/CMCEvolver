@@ -2455,7 +2455,7 @@ void MeshActions::InterfacialFE_min_ca(CommandLineArguments& cmd){
     A = MeshTools::CalculateArea(m, vecArea, Normal);
     V = MeshTools::CalculateVolumeDivergenceTheorem(m, vecArea, Normal);
     MeshTools::CalculateAVnbs(m, shape.get(), BoundaryIndices,
-                                ulist, vlist, Anbs, Vnbs,10000, false, Volume_shift);
+                                ulist, vlist, Anbs, Vnbs,10000, true, Volume_shift);
 
     a_list.push_back(A);
     v_list.push_back(V);
