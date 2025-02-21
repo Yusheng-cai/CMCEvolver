@@ -261,4 +261,7 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("CalculateAreaDistribution", "-op CalculateAreaDistribution -i" , \
                                     [](CommandLineArguments& cmd) -> void {return MeshActions::calculateAreaDistribution(cmd);},\
                                     mapF, mapU);
+    RegisterAction("MeshifyMultiCircles", "-op MeshifyMultiCircles -i", \
+                                    [](CommandLineArguments& cmd) -> void {return MeshActions::MeshifyMultiCircles(cmd);}, \
+                                    mapF, mapU);
 }

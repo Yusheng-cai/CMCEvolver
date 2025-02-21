@@ -2686,6 +2686,43 @@ void MeshTools::CalculateAVnbs(Mesh& m, AFP_shape* s,std::vector<int>& BoundaryI
     }
 }
 
+std::vector<std::unique_ptr<AFP_shape>> MeshTools::ReadMultiSpheres(CommandLineArguments& cmd){
+    // initialize the shape
+    std::vector<std::unique_ptr<AFP_shape>> shapes;
+
+    std::vector<std::string> radii;
+    std::vector<std::string> centers;
+
+    cmd.readVector("centers", CommandLineArguments::Keys::Required, centers);
+    cmd.readVector("radii", CommandLineArguments::Keys::Required, radii);
+
+    ASSERT((centers.size() / 2 == radii.size()), "Size mismatch");
+
+    for (int i=0; i<radii.size();i++){
+        // declare param pack
+        ParameterPack shapePack;
+        std::unique_ptr<AFP_shape> shape;
+        std::vector<std::string> center;
+        for (int j=i*2; j< i*2+2;j++){
+            center.push_back(centers[j]);
+        }
+        std::cout << center << std::endl;
+
+        // insert things into parameter pack
+        shapePack.insert("radius", radii[i]);
+        shapePack.insert("center", center);
+
+        // make shape
+        shape = std::make_unique<Sphere>(shapePack);
+
+        // move shape into shapes
+        shapes.push_back(std::move(shape));
+    }
+
+    return shapes;
+}
+
+
 std::unique_ptr<AFP_shape> MeshTools::ReadAFPShape(CommandLineArguments& cmd){
     std::string shape_name;
     cmd.readString("shape", CommandLineArguments::Keys::Required, shape_name);

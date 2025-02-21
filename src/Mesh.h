@@ -417,6 +417,7 @@ namespace MeshTools
 
     // helper function which helps read the inputs for shape
     std::unique_ptr<AFP_shape> ReadAFPShape(CommandLineArguments& cmd);
+    std::vector<std::unique_ptr<AFP_shape>> ReadMultiSpheres(CommandLineArguments& cmd);
 
     refineptr ReadInterfacialMin(CommandLineArguments& cmd);
     refineptr ReadInterfacialMinBoundary(CommandLineArguments& cmd);

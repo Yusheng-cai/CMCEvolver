@@ -56,6 +56,8 @@ class AFP_shape {
         virtual Real CalculateAreaZ(Real z)=0;
         virtual Real CalculatePeriZ(Real z)=0;
 
+        Real2 getCenter() {return center_;}
+
         Real shift_u_in_range(Real u);
 
         Real CalculateUGivenTargetLength(Real init_u, Real v, Real target_len, Real init_u_step=0.001, Real tolerance=1e-6, Real stepsize=0.1);

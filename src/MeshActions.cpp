@@ -1622,6 +1622,206 @@ void MeshActions::calculateAreaDistribution(CommandLineArguments& cmd){
     StringTools::WriteTabulatedData(outputfname, vecA);
 }
 
+void MeshActions::MeshifyMultiCircles(CommandLineArguments& cmd){
+    // prepare needed parameters
+    Real2 box;
+    INT2 num;
+    Real z;
+    int numBoundary = 60, optimize_iteration=10;
+    Real threshold=1.1;
+    ParameterPack EvolutionPack, curvePack, shapePack;
+    std::string outputfname="out.ply";
+    bool optimize=true, pbc=true, shift_pbc=false, inside=false;
+    Real optimize_degree=60;
+    Real3 shift;
+    Real dist_tolerance=1e-6;
+
+    // read input params
+    cmd.readArray("box", CommandLineArguments::Keys::Required, box);
+    cmd.readArray("num", CommandLineArguments::Keys::Required, num);
+    cmd.readValue("z", CommandLineArguments::Keys::Required, z);
+    cmd.readValue("numBoundary", CommandLineArguments::Keys::Optional, numBoundary);
+    cmd.readValue("threshold", CommandLineArguments::Keys::Optional, threshold);
+    cmd.readValue("o", CommandLineArguments::Keys::Optional, outputfname);
+    cmd.readBool("optimize", CommandLineArguments::Keys::Optional, optimize);
+    cmd.readValue("degree", CommandLineArguments::Keys::Optional, optimize_degree);
+    cmd.readValue("iteration", CommandLineArguments::Keys::Optional, optimize_iteration);
+    cmd.readBool("pbc", CommandLineArguments::Keys::Optional, pbc);
+
+    // initialize the shape
+    std::vector<std::unique_ptr<AFP_shape>> shapes = MeshTools::ReadMultiSpheres(cmd);
+
+    // dr 
+    Real drx = box[0] / num[0]; Real dry = box[1] / num[1];
+    Real3 box_center = {box[0] * 0.5, box[1] * 0.5, z};
+    Real3 box_length = {box[0], box[1],z};
+
+
+    // define the vectors 
+    std::vector<Real3> BoundaryVertices;
+    std::vector<INT3> faces;
+    std::vector<Point> points;
+    
+    for (int i=0;i<shapes.size();i++){
+        Real du = 2 * Constants::PI / numBoundary;
+        Real v = shapes[i]->CalculateV({0,0,z});
+        Real3 last_pos_shift ={0,0,0};
+        Real3 last_pos;
+        // whether or not the shape shifted --> whether it is periodic or not
+        bool shifted=false;
+
+        for (int j=0;j<numBoundary;j++){
+            Real3 pos = shapes[i]->calculatePos(j*du, v);
+            Real3 pos_shift = MeshTools::calculateShift(pos, box_center, box_length);
+            if (LinAlg3x3::DotProduct(pos_shift, pos_shift) > 1e-4){
+                shifted = true;
+            }
+            Real3 pos_shifted = pos + pos_shift;
+
+            BoundaryVertices.push_back(pos_shifted);
+            points.push_back(Point(pos_shifted[0], pos_shifted[1]));
+
+            if (j != 0){
+                Real3 diff = last_pos_shift - pos_shift;
+                Real diff_sq = LinAlg3x3::DotProduct(diff,diff);
+                if (std::sqrt(diff_sq) > 1e-4){
+                    std::cout << "Changed at u = " << j * du << std::endl;
+                    std::cout << "last pos = " << last_pos << std::endl;
+                    std::cout << "Shifted = " << last_pos + pos_shift << std::endl;
+                    BoundaryVertices.push_back(last_pos + pos_shift);
+                    points.push_back(Point(last_pos[0] + pos_shift[0], \
+                                        last_pos[1] + pos_shift[1]));
+                }
+            }
+
+            last_pos_shift = pos_shift;
+            last_pos = pos;
+        }
+
+        if (shifted){
+            Real3 pos = shapes[i]->calculatePos(0, v);
+
+            BoundaryVertices.push_back(pos + last_pos_shift);
+            points.push_back(Point(pos[0] + last_pos_shift[0] ,\
+                                   pos[1] + last_pos_shift[1]));
+        }
+    }
+
+    std::ofstream ofs;
+    ofs.open("bound.out");
+    for (int i=0;i<BoundaryVertices.size();i++){
+        ofs << BoundaryVertices[i] << "\n";
+    }
+    ofs.close();
+
+    // now we start the calculation --> any point that is outside the threshold, we mark it as part of the mesh
+    for (int i=0;i<num[0]+1;i++){
+        for (int j=0;j<num[1]+1;j++){
+            // obtain the position
+            Real3 position = {(double)i * drx , (double)j * dry, z};
+
+            // calculate the shape value
+            bool inside_shape = false;
+            for (int k=0;k<shapes.size();k++){
+                Real3 shape_center = {shapes[k]->getCenter()[0], shapes[k]->getCenter()[1], z};
+                Real3 pos_shift = MeshTools::calculateShift(position, shape_center, box_length);
+                Real val = shapes[k]->CalculateValue(position + pos_shift, 0,1,2);
+                if (val < threshold){
+                    inside_shape = true;
+                    break;
+                }
+            }
+            if (! inside_shape){
+                points.push_back(Point(position[0], position[1])); 
+            }
+        }
+    }
+
+    // delaunize the triangles
+    Delaunay dt;
+    dt.insert(points.begin(), points.end());
+
+    // Map to store the vertex indices
+    std::unordered_map<Delaunay::Vertex_handle, int> vertex_indices;
+    int index = 0;
+    std::vector<Real3> vertex_pos;
+    std::vector<int> BoundaryInd;
+
+    // Assign an index to each vertex
+    for (auto vertex = dt.finite_vertices_begin(); vertex != dt.finite_vertices_end(); ++vertex) {
+        vertex_indices[vertex] = index;
+        Real3 vpos = {vertex->point().x(), vertex->point().y(),z};
+        vertex_pos.push_back(vpos);
+
+        for (auto& bv : BoundaryVertices){
+            Real3 diff = vpos - bv;
+            Real dist  = std::sqrt(LinAlg3x3::DotProduct(diff,diff));
+            if (dist < 1e-5){
+                BoundaryInd.push_back(index);
+            }
+        }
+        index++;
+    }
+
+    // Iterate through the finite faces and extract the indices of their vertices
+    std::vector<INT3> face_indices;
+    for (auto face = dt.finite_faces_begin(); face != dt.finite_faces_end(); ++face) {
+        int i1 = vertex_indices[face->vertex(0)];
+        int i2 = vertex_indices[face->vertex(1)];
+        int i3 = vertex_indices[face->vertex(2)];
+
+        int num_boundary_points = Algorithm::contain(BoundaryInd,i1) + Algorithm::contain(BoundaryInd,i2) + Algorithm::contain(BoundaryInd,i3);
+
+        if (num_boundary_points == 3){
+            continue;
+        }
+
+        // construct the face
+        INT3 f = {i1, i2, i3};
+
+        // find the length of the 3 edges
+        Real3 v1,v2,v3;
+        Real3 d1,d2,d3;
+        Real d1_sq, d2_sq, d3_sq;
+        v1 = vertex_pos[f[0]]; v2= vertex_pos[f[1]]; v3 =vertex_pos[f[2]];
+
+        d1 = v2 -v1; d2 = v3-v1; d3= v3-v2;
+        d1_sq = std::sqrt(LinAlg3x3::DotProduct(d1,d1));
+        d2_sq = std::sqrt(LinAlg3x3::DotProduct(d2,d2));
+        d3_sq = std::sqrt(LinAlg3x3::DotProduct(d3,d3));
+
+        if (d1_sq > 0.2 || d2_sq > 0.2 || d3_sq > 0.2){
+            continue;
+        }
+
+        face_indices.push_back(f);
+    }
+
+    Mesh m(vertex_pos, face_indices);
+
+    // optimize the mesh a little
+    if (optimize){
+        MeshTools::CGAL_optimize_Mesh(m, optimize_iteration, optimize_degree);
+        MeshTools::CVT_optimize_Mesh(m);
+    }
+
+    if (pbc){
+        m.setBoxLength({box[0], box[1],0});
+        MeshTools::MakePBCMesh(m);
+
+        if (shift_pbc){
+            MeshTools::ShiftPBCMesh(m, shift);
+        }
+
+        m.CalcVertexNormals();
+    }
+
+    // output the mesh
+    MeshTools::ChangeWindingOrderPosZ(m);
+    m.CalcVertexNormals();
+    MeshTools::writePLY(outputfname, m);
+}
+
 void MeshActions::MeshifyShape(CommandLineArguments& cmd){
     // prepare needed parameters
     Real2 box;

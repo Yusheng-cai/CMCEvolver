@@ -212,12 +212,12 @@ void InterfacialFE_minimization::refine(Mesh& mesh){
         //     update_Mesh(mesh);
         // }
 
-        // if ((i+1) % optimize_every == 0){
-        //     MeshTools::CGAL_optimize_Mesh(mesh, 10, 60);
-        //     MeshTools::ChangeWindingOrderPosZ(mesh);
+        if ((i+1) % optimize_every == 0){
+            MeshTools::CGAL_optimize_Mesh(mesh, 10, 60);
+            MeshTools::ChangeWindingOrderPosZ(mesh);
 
-        //     update_Mesh(mesh);
-        // }
+            update_Mesh(mesh);
+        }
     }
 
     mesh.CalcVertexNormals();
