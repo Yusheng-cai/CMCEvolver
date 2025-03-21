@@ -246,6 +246,9 @@ namespace MeshActions
     // calculate volume underneath
     void calculateInterfaceVolumeUnderneath(CommandLineArguments& cmd);
 
+    // calculate NBS volume underneath
+    void calculateNBSVolumeUnderneath(CommandLineArguments& cmd);
+
     // CVT optimization
     void CVT_Mesh_optimization(CommandLineArguments& cmd);
 

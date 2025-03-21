@@ -249,6 +249,9 @@ void RegisterAllActions(mapFunction& mapF, mapUsage& mapU)
     RegisterAction("InterfaceVolumeUnderneath", "-op InterfaceVolumeUnderneath -i", \
                                                 [](CommandLineArguments& cmd) -> void {return MeshActions::calculateInterfaceVolumeUnderneath(cmd);},\
                                                 mapF, mapU);
+    RegisterAction("NBSVolumeUnderneath", "-op NBSVolumeUnderneath -i" ,\
+                                                [](CommandLineArguments& cmd) -> void {return MeshActions::calculateNBSVolumeUnderneath(cmd);} ,\
+                                                mapF, mapU);
     RegisterAction("Mesh_Eta", "-op Mesh_Eta -i", \
                                            [](CommandLineArguments& cmd) -> void {return MeshActions::Mesh_Eta(cmd);},\
                                            mapF, mapU);

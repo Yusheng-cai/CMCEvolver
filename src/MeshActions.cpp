@@ -4544,7 +4544,10 @@ void MeshActions::calculateSurfaceArea(CommandLineArguments& cmd){
         sum_area += areas[i];
     }
 
-    std::cout << "area = " << sum_area << std::endl;
+    std::ofstream ofs;
+    ofs.open(outputfname);
+    ofs << sum_area;
+    ofs.close();
 }
 
 void MeshActions::calculateInterfaceVolume(CommandLineArguments& cmd){
@@ -4619,6 +4622,35 @@ void MeshActions::calculateInterfaceVolumeUnderneath(CommandLineArguments& cmd){
     ofs << Volume_underneath << "\n";
     ofs.close();
 }
+
+void MeshActions::calculateNBSVolumeUnderneath(CommandLineArguments& cmd){
+    std::string inputfname, outputfname="volume_underneath.out";
+    Real offset_height;
+    int projected_plane=2;
+    bool isPBC=false, calc_shape=false;
+    Real3 box;
+
+    bool useNumerical=true;
+    cmd.readString("i", CommandLineArguments::Keys::Required, inputfname);
+    cmd.readString("o", CommandLineArguments::Keys::Optional, outputfname);
+    isPBC = cmd.readArray("box", CommandLineArguments::Keys::Optional, box);
+    cmd.readValue("projected_plane", CommandLineArguments::Keys::Optional, projected_plane);
+    cmd.readBool("useNumerical", CommandLineArguments::Keys::Optional, useNumerical);
+
+    Mesh m;
+    MeshTools::readPLYlibr(inputfname, m);
+    if (isPBC){
+        m.setBoxLength(box);
+    }
+
+    std::unique_ptr<AFP_shape> shape = MeshTools::ReadAFPShape(cmd);
+    Real Vnbs_underneath = MeshTools::CalculateVnbsUnderneath(m, shape.get(), projected_plane, 10000, useNumerical);
+    std::ofstream ofs;
+    ofs.open(outputfname);
+    ofs << Vnbs_underneath;
+    ofs.close();
+}
+
 
 void MeshActions::CVT_Mesh_optimization(CommandLineArguments& cmd){
     std::string inputfname, outputfname="out.ply";
